@@ -5,18 +5,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { Request } from 'express';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
-  private clerk;
-
-  constructor(private config: ConfigService) {
-    this.clerk = createClerkClient({
-      secretKey: this.config.get<string>('CLERK_SECRET_KEY'),
-    });
-  }
+  constructor(private config: ConfigService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -29,13 +23,21 @@ export class ClerkAuthGuard implements CanActivate {
     const token = authHeader.replace('Bearer ', '');
 
     try {
-      const payload = await this.clerk.verifyToken(token);
+      // verifyToken() với jwtKey = PEM public key từ Clerk Dashboard
+      // → verify chữ ký RSA256 hoàn toàn OFFLINE, không cần fetch JWKS qua network
+      // → hacker không thể forge token dù biết userId
+      const payload = await verifyToken(token, {
+        jwtKey: this.config.get<string>('CLERK_JWT_KEY'),
+        authorizedParties: [
+          'http://localhost:3000',
+          this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000',
+        ],
+      });
 
-      // Đính kèm clerkUserId vào request để dùng ở controller/service
       (request as any).clerkUserId = payload.sub;
-
       return true;
-    } catch {
+    } catch (err: any) {
+      console.error('[ClerkAuthGuard] verifyToken failed:', err?.message || err);
       throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
     }
   }
