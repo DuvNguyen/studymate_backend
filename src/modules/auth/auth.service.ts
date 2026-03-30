@@ -2,12 +2,21 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
+import { Role } from '../../database/entities/role.entity';
+import { InstructorProfile, KycStatus } from '../../database/entities/instructor-profile.entity';
+import { createClerkClient } from '@clerk/backend';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
+
+    @InjectRepository(Role)
+    private roleRepo: Repository<Role>,
+
+    @InjectRepository(InstructorProfile)
+    private instructorProfileRepo: Repository<InstructorProfile>,
   ) {}
 
   // Lấy user từ DB dựa theo clerkUserId (đã được verify bởi guard)
@@ -47,5 +56,47 @@ export class AuthService {
       status: user.status,
       createdAt: user.createdAt,
     };
+  }
+
+  async onboardUser(clerkUserId: string, targetRole: string) {
+    // Chỉ chấp nhận STUDENT hoặc INSTRUCTOR
+    const validRole = targetRole === 'INSTRUCTOR' ? 'INSTRUCTOR' : 'STUDENT';
+
+    const roleRecord = await this.roleRepo.findOne({
+      where: { roleName: validRole },
+    });
+
+    if (!roleRecord) {
+      throw new Error(`Khoá định danh Role ${validRole} không tồn tại trong DB.`);
+    }
+
+    const user = await this.userRepo.findOne({ where: { clerkUserId } });
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản');
+
+    // 1. Cập nhật role_id trong database
+    user.roleId = roleRecord.id;
+    await this.userRepo.save(user);
+
+    // 2. Cập nhật `public_metadata` trên hệ thống Clerk thông qua SDK
+    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+    await clerk.users.updateUserMetadata(clerkUserId, {
+      publicMetadata: { role: validRole },
+    });
+
+    // 3. (Strict RBAC) Nếu là Giảng viên, cấp luôn profile trắng để nộp KYC
+    if (validRole === 'INSTRUCTOR') {
+      const existingInstructorProfile = await this.instructorProfileRepo.findOne({
+        where: { userId: user.id },
+      });
+
+      if (!existingInstructorProfile) {
+        await this.instructorProfileRepo.save({
+          userId: user.id,
+          kycStatus: KycStatus.PENDING,
+        });
+      }
+    }
+
+    return { role: validRole };
   }
 }

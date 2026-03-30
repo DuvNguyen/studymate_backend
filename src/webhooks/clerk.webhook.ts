@@ -13,6 +13,8 @@ import { Webhook } from 'svix';
 import type { Request } from 'express';
 import { User } from '../database/entities/user.entity';
 import { Role } from '../database/entities/role.entity';
+import { Profile } from '../database/entities/profile.entity';
+import { InstructorProfile, KycStatus } from '../database/entities/instructor-profile.entity';
 
 @Controller('webhooks')
 export class ClerkWebhookController {
@@ -22,6 +24,12 @@ export class ClerkWebhookController {
 
     @InjectRepository(Role)
     private roleRepo: Repository<Role>,
+
+    @InjectRepository(Profile)
+    private profileRepo: Repository<Profile>,
+
+    @InjectRepository(InstructorProfile)
+    private instructorProfileRepo: Repository<InstructorProfile>,
 
     private config: ConfigService,
   ) {}
@@ -68,26 +76,48 @@ export class ClerkWebhookController {
         return { received: true };
       }
 
-      // Lấy role STUDENT mặc định
-      const studentRole = await this.roleRepo.findOne({
-        where: { roleName: 'STUDENT' },
+      // Đọc Role từ Metadata truyền sang (nếu không có, cho là STUDENT)
+      const roleFromMetadata = payload.data.public_metadata?.role;
+      const roleNameToFind = roleFromMetadata === 'INSTRUCTOR' ? 'INSTRUCTOR' : 'STUDENT';
+
+      // Lấy role từ DB
+      const dbRole = await this.roleRepo.findOne({
+        where: { roleName: roleNameToFind },
       });
 
-      if (!studentRole) {
+      if (!dbRole) {
         throw new InternalServerErrorException(
-          'Role STUDENT chưa được khởi tạo trong DB. Hãy chạy seed trước.',
+          `Role ${roleNameToFind} chưa được khởi tạo. Hãy chạy seed trước.`,
         );
       }
 
-      // Tạo user mới trong DB
-      await this.userRepo.save({
+      // Tạo user mới trong DB và GÁN VAI TRÒ CHÍNH XÁC ngay từ đầu
+      const newUser = await this.userRepo.save({
         clerkUserId,
         email,
-        roleId: studentRole.id,
+        roleId: dbRole.id,
         avatarUrl: image_url || null,
       });
 
-      console.log(`✅ Tạo user mới từ Clerk: ${email}`);
+      // Tạo profile cho user (tách fullName từ first_name và last_name)
+      const firstName = payload.data.first_name || '';
+      const lastName = payload.data.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      await this.profileRepo.save({
+        userId: newUser.id,
+        fullName: fullName || undefined,
+      });
+
+      // (Luồng Strict RBAC) Nếu là Giảng viên, tự động tạo InstructorProfile để nộp KYC
+      if (roleNameToFind === 'INSTRUCTOR') {
+        await this.instructorProfileRepo.save({
+          userId: newUser.id,
+          kycStatus: KycStatus.PENDING,
+        });
+      }
+
+      console.log(`✅ Tạo user & role:[${roleNameToFind}] mới từ Clerk: ${email}`);
     }
 
     // Xử lý sự kiện user.updated (sync email, avatar)

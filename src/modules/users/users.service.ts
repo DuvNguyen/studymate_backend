@@ -1,0 +1,261 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User, UserStatus } from '../../database/entities/user.entity';
+import { Role } from '../../database/entities/role.entity';
+import { Profile } from '../../database/entities/profile.entity';
+import { InstructorProfile, KycStatus } from '../../database/entities/instructor-profile.entity';
+import { InstructorDocument } from '../../database/entities/instructor-document.entity';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateKycDto } from './dto/update-kyc.dto';
+import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
+
+export interface PaginatedUsers {
+  data: any[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private userRepo: Repository<User>,
+    @InjectRepository(Role)
+    private roleRepo: Repository<Role>,
+    @InjectRepository(Profile)
+    private profileRepo: Repository<Profile>,
+    @InjectRepository(InstructorProfile)
+    private instructorProfileRepo: Repository<InstructorProfile>,
+    @InjectRepository(InstructorDocument)
+    private instructorDocumentRepo: Repository<InstructorDocument>,
+  ) {}
+
+  // ─── Profile (bản thân) ────────────────────────────────────────────────────
+
+  async getProfile(clerkUserId: string) {
+    const user = await this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['role', 'profile'],
+    });
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+    return this.toPublicProfile(user);
+  }
+
+  async updateProfile(clerkUserId: string, dto: UpdateProfileDto) {
+    const user = await this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['role', 'profile'],
+    });
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+
+    // Nếu chưa có profile (do lỗi sync), tự tạo 1 cái rỗng
+    if (!user.profile) {
+       user.profile = this.profileRepo.create({ userId: user.id });
+    }
+
+    if (dto.firstName !== undefined || dto.lastName !== undefined) {
+      // fullName = firstName + lastName
+      const fName = dto.firstName !== undefined ? dto.firstName : (user.profile.fullName ? user.profile.fullName.split(' ')[0] : '');
+      const lName = dto.lastName !== undefined ? dto.lastName : (user.profile.fullName ? user.profile.fullName.split(' ').slice(1).join(' ') : '');
+      user.profile.fullName = `${fName} ${lName}`.trim();
+    }
+    
+    if (dto.bio !== undefined) user.profile.bio = dto.bio;
+    if (dto.avatarUrl !== undefined) user.avatarUrl = dto.avatarUrl;
+
+    await this.profileRepo.save(user.profile);
+    await this.userRepo.save(user);
+
+    return this.toPublicProfile(user);
+  }
+
+  // ─── KYC (Giảng viên) ──────────────────────────────────────────────────────
+
+  async getInstructorKyc(clerkUserId: string) {
+    const user = await this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['instructorProfile', 'instructorDocuments'],
+    });
+
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+    if (user.roleId !== 2) throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên');
+
+    let profile = user.instructorProfile;
+    if (!profile) {
+      profile = await this.instructorProfileRepo.save({
+        userId: user.id,
+        kycStatus: KycStatus.PENDING,
+      });
+    }
+
+    return {
+      idCardUrl: profile.idCardUrl,
+      bankAccountName: profile.bankAccountName,
+      bankAccountNumber: profile.bankAccountNumber,
+      bankName: profile.bankName,
+      kycStatus: profile.kycStatus,
+      rejectionReason: profile.rejectionReason,
+      documents: user.instructorDocuments || [],
+    };
+  }
+
+  async updateInstructorKyc(clerkUserId: string, dto: UpdateKycDto) {
+    const user = await this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['instructorProfile', 'instructorDocuments'],
+    });
+
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+    if (user.roleId !== 2) throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên');
+
+    let profile = user.instructorProfile;
+    if (!profile) {
+      profile = this.instructorProfileRepo.create({ userId: user.id });
+    }
+
+    // Cập nhật thông tin profile
+    if (dto.idCardUrl !== undefined) profile.idCardUrl = dto.idCardUrl;
+    if (dto.bankAccountName !== undefined) profile.bankAccountName = dto.bankAccountName;
+    if (dto.bankAccountNumber !== undefined) profile.bankAccountNumber = dto.bankAccountNumber;
+    if (dto.bankName !== undefined) profile.bankName = dto.bankName;
+    
+    // Đang PENDING chuyển thành PENDING_REVIEW (hoặc giữ nguyên để chờ Admin)
+    profile.kycStatus = KycStatus.PENDING; // Tạm khóa trạng thái
+    await this.instructorProfileRepo.save(profile);
+
+    // Cập nhật Document: Xoá cũ, Thêm mới (Cơ bản)
+    if (dto.documents && dto.documents.length > 0) {
+      await this.instructorDocumentRepo.delete({ userId: user.id });
+      const newDocs = dto.documents.map(doc => this.instructorDocumentRepo.create({
+        userId: user.id,
+        ...doc,
+      }));
+      await this.instructorDocumentRepo.save(newDocs);
+    }
+
+    return this.getInstructorKyc(clerkUserId);
+  }
+
+  // ─── Admin – list & detail ──────────────────────────────────────────────────
+
+  async findAll(opts: {
+    page: number;
+    limit: number;
+    role?: string;
+    status?: string;
+    search?: string;
+  }): Promise<PaginatedUsers> {
+    const { page, limit, role, status, search } = opts;
+    const skip = (page - 1) * limit;
+
+    const qb = this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.profile', 'profile')
+      .orderBy('user.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (role) {
+      qb.andWhere('role.role_name = :role', { role });
+    }
+    if (status) {
+      qb.andWhere('user.status = :status', { status });
+    }
+    if (search) {
+      qb.andWhere('user.email ILIKE :search', { search: `%${search}%` });
+    }
+
+    const [users, total] = await qb.getManyAndCount();
+
+    return {
+      data: users.map((u) => this.toPublicProfile(u)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async findOneById(id: number) {
+    const user = await this.userRepo.findOne({
+      where: { id },
+      relations: ['role', 'profile'],
+    });
+    if (!user) throw new NotFoundException(`Không tìm thấy user #${id}`);
+    return this.toPublicProfile(user);
+  }
+
+  // ─── Admin – mutations ──────────────────────────────────────────────────────
+
+  async updateStatus(
+    targetId: number,
+    dto: UpdateUserStatusDto,
+    requestor: User,
+  ) {
+    const target = await this.userRepo.findOne({
+      where: { id: targetId },
+      relations: ['role'],
+    });
+    if (!target) throw new NotFoundException(`Không tìm thấy user #${targetId}`);
+    if (target.id === requestor.id) {
+      throw new ForbiddenException('Không thể tự thay đổi trạng thái của chính mình');
+    }
+
+    target.status = dto.status;
+    await this.userRepo.save(target);
+    return this.toPublicProfile(target);
+  }
+
+  async updateRole(
+    targetId: number,
+    dto: UpdateUserRoleDto,
+    requestor: User,
+  ) {
+    const target = await this.userRepo.findOne({
+      where: { id: targetId },
+      relations: ['role'],
+    });
+    if (!target) throw new NotFoundException(`Không tìm thấy user #${targetId}`);
+    if (target.id === requestor.id) {
+      throw new ForbiddenException('Không thể tự thay đổi role của chính mình');
+    }
+
+    const role = await this.roleRepo.findOne({ where: { id: dto.roleId } });
+    if (!role) throw new NotFoundException(`Không tìm thấy role #${dto.roleId}`);
+
+    target.roleId = role.id;
+    target.role = role;
+    await this.userRepo.save(target);
+    return this.toPublicProfile(target);
+  }
+
+  // ─── Helper ─────────────────────────────────────────────────────────────────
+
+  private toPublicProfile(user: User) {
+    const fName = user.profile?.fullName ? user.profile.fullName.split(' ')[0] : null;
+    const lName = user.profile?.fullName ? user.profile.fullName.split(' ').slice(1).join(' ') : null;
+    
+    return {
+      id: user.id,
+      clerkUserId: user.clerkUserId,
+      email: user.email,
+      firstName: fName,
+      lastName: lName,
+      fullName: user.profile?.fullName ?? null,
+      bio: user.profile?.bio ?? null,
+      avatarUrl: user.avatarUrl ?? null,
+      role: user.role?.roleName ?? null,
+      roleId: user.roleId,
+      status: user.status,
+      violationCount: user.violationCount,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+}

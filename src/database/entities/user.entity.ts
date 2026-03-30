@@ -3,12 +3,18 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
   Index,
 } from 'typeorm';
 import { Role } from './role.entity';
+import { Profile } from './profile.entity';
+import { InstructorProfile } from './instructor-profile.entity';
+import { InstructorDocument } from './instructor-document.entity';
+import { StaffProfile } from './staff-profile.entity';
 
 export enum UserStatus {
   ACTIVE = 'ACTIVE',
@@ -36,6 +42,18 @@ export class User {
   @ManyToOne(() => Role, (role) => role.users, { eager: true })
   @JoinColumn({ name: 'role_id' })
   role: Role;
+
+  @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
+  profile: Profile;
+
+  @OneToOne(() => InstructorProfile, (ip) => ip.user, { cascade: true })
+  instructorProfile: InstructorProfile;
+
+  @OneToOne(() => StaffProfile, (sp) => sp.user, { cascade: true })
+  staffProfile: StaffProfile;
+
+  @OneToMany(() => InstructorDocument, (doc) => doc.user, { cascade: true })
+  instructorDocuments: InstructorDocument[];
 
   @Column({ nullable: true, name: 'avatar_url' })
   avatarUrl: string;

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { ClerkUserId } from '../../common/decorators/current-user.decorator';
@@ -16,6 +16,21 @@ export class AuthController {
     return {
       data: user,
       message: 'Lấy thông tin người dùng thành công',
+    };
+  }
+
+  // POST /api/v1/auth/onboard
+  // Được trigger sau khi User đăng ký qua luồng riêng, để gắn chặt role
+  @Post('onboard')
+  @UseGuards(ClerkAuthGuard)
+  async onboardUser(
+    @ClerkUserId() clerkUserId: string,
+    @Body('role') role: string,
+  ) {
+    const result = await this.authService.onboardUser(clerkUserId, role);
+    return {
+      data: result,
+      message: 'Thiết lập định danh role thành công',
     };
   }
 

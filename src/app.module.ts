@@ -7,6 +7,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { User } from './database/entities/user.entity';
 import { Role } from './database/entities/role.entity';
@@ -21,7 +22,7 @@ import { Role } from './database/entities/role.entity';
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
-        entities: [User, Role],
+        autoLoadEntities: true,
         synchronize: config.get('NODE_ENV') !== 'production',
         logging: config.get('NODE_ENV') === 'development',
       }),
@@ -30,6 +31,7 @@ import { Role } from './database/entities/role.entity';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
 
     AuthModule,
+    UsersModule,
     WebhooksModule,
   ],
   providers: [
