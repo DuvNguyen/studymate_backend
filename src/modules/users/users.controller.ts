@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Put,
+  Delete,
   Param,
   Body,
   Query,
@@ -140,5 +141,13 @@ export class UsersController {
   ) {
     const user = await this.usersService.updateRole(id, dto, requestor);
     return { data: user, message: 'Cập nhật role thành công' };
+  }
+
+  /** DELETE /api/v1/users/:id */
+  @Roles('ADMIN')
+  @Delete(':id')
+  async deleteUser(@Param('id', ParseIntPipe) id: number) {
+    const result = await this.usersService.deleteUser(id);
+    return { data: result, message: 'Xóa hệ thống và Clerk thành công' };
   }
 }

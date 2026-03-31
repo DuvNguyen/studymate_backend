@@ -15,6 +15,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
 import { UpdateStaffProfileDto } from './dto/update-staff-profile.dto';
 import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
+import { createClerkClient } from '@clerk/backend';
 
 export interface PaginatedUsers {
   data: any[];
@@ -285,6 +286,28 @@ export class UsersService {
     target.role = role;
     await this.userRepo.save(target);
     return this.toPublicProfile(target);
+  }
+
+  // ─── Xóa User ───────────────────────────────────────────────────────────────
+
+  async deleteUser(id: number) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`Không tìm thấy user #${id}`);
+    }
+
+    // 1. Xóa trên Clerk để giải phóng Email
+    try {
+      const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+      await clerk.users.deleteUser(user.clerkUserId);
+    } catch (error: any) {
+      console.warn(`[deleteUser] Lỗi hoặc user không tồn tại trên Clerk:`, error.message);
+      // Vẫn tiếp tục thực hiện xóa local để đảm bảo đồng bộ
+    }
+
+    // 2. Xóa trong CSDL Local (sẽ tự động cascade xóa các dữ liệu liên quan)
+    await this.userRepo.delete(id);
+    return { id };
   }
 
   // ─── Helper ─────────────────────────────────────────────────────────────────

@@ -70,32 +70,43 @@ export class AuthService {
       throw new Error(`Khoá định danh Role ${validRole} không tồn tại trong DB.`);
     }
 
-    let user = await this.userRepo.findOne({ where: { clerkUserId } });
     const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+    let clerkUser: any;
+    try {
+      clerkUser = await clerk.users.getUser(clerkUserId);
+    } catch (error: any) {
+      throw new UnauthorizedException('Không thể xác thực info từ Clerk: ' + error.message);
+    }
+
+    const email = clerkUser.emailAddresses[0]?.emailAddress;
+    if (!email) throw new Error('Không tìm thấy email từ Clerk');
+
+    // Tìm user theo clerkUserId (ưu tiên) hoặc email (phòng hờ account bị xóa trên Clerk nhưng còn kẹt trong DB)
+    let user = await this.userRepo.findOne({
+      where: [
+        { clerkUserId },
+        { email }
+      ]
+    });
 
     if (!user) {
-      // Nếu Webhook chưa kịp sync hoặc đang chạy local không có Ngrok
-      // Chủ động kéo thông tin từ Clerk để tạo User
-      try {
-        const clerkUser = await clerk.users.getUser(clerkUserId);
-        const email = clerkUser.emailAddresses[0]?.emailAddress;
-        
-        if (!email) throw new Error('Không tìm thấy email từ Clerk');
-
-        user = this.userRepo.create({
-          clerkUserId,
-          email,
-          roleId: roleRecord.id,
-          avatarUrl: clerkUser.imageUrl,
-          status: UserStatus.ACTIVE,
-        });
-        await this.userRepo.save(user);
-      } catch (error: any) {
-        throw new UnauthorizedException('Không tìm thấy tài khoản và không thể đồng bộ từ Clerk: ' + error.message);
-      }
+      // User hoàn toàn mới
+      user = this.userRepo.create({
+        clerkUserId,
+        email,
+        roleId: roleRecord.id,
+        avatarUrl: clerkUser.imageUrl,
+        status: UserStatus.ACTIVE,
+      });
+      await this.userRepo.save(user);
     } else {
-      // 1. Cập nhật role_id trong database nếu đã tồn tại
+      // Tự động Heal data nếu clerkUserId bị lệch (vì tạo lại acc cùng email trên Clerk)
+      if (user.clerkUserId !== clerkUserId) {
+        user.clerkUserId = clerkUserId;
+      }
+      // Cập nhật role_id trong database
       user.roleId = roleRecord.id;
+      user.avatarUrl = clerkUser.imageUrl;
       await this.userRepo.save(user);
     }
 
