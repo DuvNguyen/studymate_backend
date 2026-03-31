@@ -53,6 +53,9 @@ export class InstructorProfile {
   @Column({ type: 'timestamp', nullable: true, name: 'approved_at' })
   approvedAt: Date;
 
+  @Column({ type: 'jsonb', nullable: true, name: 'certificates' })
+  certificates: any[];
+
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

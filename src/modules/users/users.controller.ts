@@ -15,6 +15,7 @@ import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { ClerkUserId, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
+import { UpdateStaffProfileDto } from './dto/update-staff-profile.dto';
 import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -61,6 +62,25 @@ export class UsersController {
   ) {
     const kycData = await this.usersService.updateInstructorKyc(clerkUserId, dto);
     return { data: kycData, message: 'Cập nhật KYC thành công' };
+  }
+
+  // ─── Staff Profile ─────────────────────────────────────────────────────────
+
+  /** GET /api/v1/users/me/staff */
+  @Get('me/staff')
+  async getStaffProfile(@ClerkUserId() clerkUserId: string) {
+    const profile = await this.usersService.getStaffProfile(clerkUserId);
+    return { data: profile, message: 'Lấy thông tin nhân viên thành công' };
+  }
+
+  /** PUT /api/v1/users/me/staff */
+  @Put('me/staff')
+  async updateStaffProfile(
+    @ClerkUserId() clerkUserId: string,
+    @Body() dto: UpdateStaffProfileDto,
+  ) {
+    const profile = await this.usersService.updateStaffProfile(clerkUserId, dto);
+    return { data: profile, message: 'Cập nhật thông tin nhân viên thành công' };
   }
 
   // ─── Admin – danh sách & chi tiết ──────────────────────────────────────────

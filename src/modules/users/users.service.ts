@@ -10,8 +10,10 @@ import { Role } from '../../database/entities/role.entity';
 import { Profile } from '../../database/entities/profile.entity';
 import { InstructorProfile, KycStatus } from '../../database/entities/instructor-profile.entity';
 import { InstructorDocument } from '../../database/entities/instructor-document.entity';
+import { StaffProfile, StaffDepartment } from '../../database/entities/staff-profile.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
+import { UpdateStaffProfileDto } from './dto/update-staff-profile.dto';
 import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
 
 export interface PaginatedUsers {
@@ -34,6 +36,8 @@ export class UsersService {
     private instructorProfileRepo: Repository<InstructorProfile>,
     @InjectRepository(InstructorDocument)
     private instructorDocumentRepo: Repository<InstructorDocument>,
+    @InjectRepository(StaffProfile)
+    private staffProfileRepo: Repository<StaffProfile>,
   ) {}
 
   // ─── Profile (bản thân) ────────────────────────────────────────────────────
@@ -101,6 +105,7 @@ export class UsersService {
       bankName: profile.bankName,
       kycStatus: profile.kycStatus,
       rejectionReason: profile.rejectionReason,
+      certificates: profile.certificates || [],
       documents: user.instructorDocuments || [],
     };
   }
@@ -124,6 +129,7 @@ export class UsersService {
     if (dto.bankAccountName !== undefined) profile.bankAccountName = dto.bankAccountName;
     if (dto.bankAccountNumber !== undefined) profile.bankAccountNumber = dto.bankAccountNumber;
     if (dto.bankName !== undefined) profile.bankName = dto.bankName;
+    if (dto.certificates !== undefined) profile.certificates = dto.certificates;
     
     // Đang PENDING chuyển thành PENDING_REVIEW (hoặc giữ nguyên để chờ Admin)
     profile.kycStatus = KycStatus.PENDING; // Tạm khóa trạng thái
@@ -140,6 +146,52 @@ export class UsersService {
     }
 
     return this.getInstructorKyc(clerkUserId);
+  }
+
+  // ─── Staff Profile ──────────────────────────────────────────────────────────
+
+  async getStaffProfile(clerkUserId: string) {
+    const user = await this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['staffProfile'],
+    });
+
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+    if (user.roleId !== 3 && user.roleId !== 4) throw new ForbiddenException('Tính năng này chỉ dành cho Nhân viên hoặc Quản trị viên');
+
+    let profile = user.staffProfile;
+    if (!profile) {
+      profile = await this.staffProfileRepo.save({
+        userId: user.id,
+        fullName: user.email.split('@')[0], 
+        department: StaffDepartment.SUPPORT,
+      });
+    }
+
+    return profile;
+  }
+
+  async updateStaffProfile(clerkUserId: string, dto: UpdateStaffProfileDto) {
+    const user = await this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['staffProfile'],
+    });
+
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+    if (user.roleId !== 3 && user.roleId !== 4) throw new ForbiddenException('Tính năng này chỉ dành cho Nhân viên hoặc Quản trị viên');
+
+    let profile = user.staffProfile;
+    if (!profile) {
+      profile = this.staffProfileRepo.create({ userId: user.id });
+    }
+
+    if (dto.fullName !== undefined) profile.fullName = dto.fullName;
+    if (dto.phoneNumber !== undefined) profile.phoneNumber = dto.phoneNumber;
+    if (dto.department !== undefined) profile.department = dto.department;
+
+    await this.staffProfileRepo.save(profile);
+
+    return profile;
   }
 
   // ─── Admin – list & detail ──────────────────────────────────────────────────
@@ -185,7 +237,7 @@ export class UsersService {
   async findOneById(id: number) {
     const user = await this.userRepo.findOne({
       where: { id },
-      relations: ['role', 'profile'],
+      relations: ['role', 'profile', 'instructorProfile', 'instructorDocuments'],
     });
     if (!user) throw new NotFoundException(`Không tìm thấy user #${id}`);
     return this.toPublicProfile(user);
@@ -254,6 +306,12 @@ export class UsersService {
       roleId: user.roleId,
       status: user.status,
       violationCount: user.violationCount,
+      instructorProfile: user.instructorProfile ? {
+        bankName: user.instructorProfile.bankName,
+        kycStatus: user.instructorProfile.kycStatus,
+        certificates: user.instructorProfile.certificates,
+        documents: user.instructorDocuments || [],
+      } : null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

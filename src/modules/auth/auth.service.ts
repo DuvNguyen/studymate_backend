@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../../database/entities/user.entity';
+import { User, UserStatus } from '../../database/entities/user.entity';
 import { Role } from '../../database/entities/role.entity';
 import { InstructorProfile, KycStatus } from '../../database/entities/instructor-profile.entity';
 import { createClerkClient } from '@clerk/backend';
@@ -70,15 +70,36 @@ export class AuthService {
       throw new Error(`Khoá định danh Role ${validRole} không tồn tại trong DB.`);
     }
 
-    const user = await this.userRepo.findOne({ where: { clerkUserId } });
-    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản');
+    let user = await this.userRepo.findOne({ where: { clerkUserId } });
+    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
-    // 1. Cập nhật role_id trong database
-    user.roleId = roleRecord.id;
-    await this.userRepo.save(user);
+    if (!user) {
+      // Nếu Webhook chưa kịp sync hoặc đang chạy local không có Ngrok
+      // Chủ động kéo thông tin từ Clerk để tạo User
+      try {
+        const clerkUser = await clerk.users.getUser(clerkUserId);
+        const email = clerkUser.emailAddresses[0]?.emailAddress;
+        
+        if (!email) throw new Error('Không tìm thấy email từ Clerk');
+
+        user = this.userRepo.create({
+          clerkUserId,
+          email,
+          roleId: roleRecord.id,
+          avatarUrl: clerkUser.imageUrl,
+          status: UserStatus.ACTIVE,
+        });
+        await this.userRepo.save(user);
+      } catch (error: any) {
+        throw new UnauthorizedException('Không tìm thấy tài khoản và không thể đồng bộ từ Clerk: ' + error.message);
+      }
+    } else {
+      // 1. Cập nhật role_id trong database nếu đã tồn tại
+      user.roleId = roleRecord.id;
+      await this.userRepo.save(user);
+    }
 
     // 2. Cập nhật `public_metadata` trên hệ thống Clerk thông qua SDK
-    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
     await clerk.users.updateUserMetadata(clerkUserId, {
       publicMetadata: { role: validRole },
     });
