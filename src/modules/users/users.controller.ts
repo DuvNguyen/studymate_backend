@@ -86,6 +86,26 @@ export class UsersController {
 
   // ─── Admin – danh sách & chi tiết ──────────────────────────────────────────
 
+  /** GET /api/v1/users/kyc-pending */
+  @Roles('ADMIN', 'STAFF')
+  @Get('kyc-pending')
+  async getPendingKyc() {
+    const result = await this.usersService.getPendingKyc();
+    return { data: result, message: 'Lấy danh sách KYC chờ duyệt thành công' };
+  }
+
+  /** PATCH /api/v1/users/:id/kyc-status */
+  @Roles('ADMIN', 'STAFF')
+  @Patch(':id/kyc-status')
+  async reviewKyc(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('status') status: any,
+    @Body('reason') reason?: string,
+  ) {
+    const result = await this.usersService.reviewKyc(id, status, reason);
+    return { data: result, message: 'Đã cập nhật trạng thái KYC' };
+  }
+
   /**
    * GET /api/v1/users
    * Query: page, limit, role, status, search
@@ -146,8 +166,8 @@ export class UsersController {
   /** DELETE /api/v1/users/:id */
   @Roles('ADMIN')
   @Delete(':id')
-  async deleteUser(@Param('id', ParseIntPipe) id: number) {
-    const result = await this.usersService.deleteUser(id);
+  async deleteUser(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestor: User) {
+    const result = await this.usersService.deleteUser(id, requestor);
     return { data: result, message: 'Xóa hệ thống và Clerk thành công' };
   }
 }

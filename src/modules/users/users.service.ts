@@ -197,6 +197,33 @@ export class UsersService {
 
   // ─── Admin – list & detail ──────────────────────────────────────────────────
 
+  async getPendingKyc() {
+    const qb = this.userRepo
+      .createQueryBuilder('user')
+      .innerJoinAndSelect('user.instructorProfile', 'instructorProfile')
+      .leftJoinAndSelect('user.instructorDocuments', 'instructorDocuments')
+      .leftJoinAndSelect('user.profile', 'profile')
+      .where('instructorProfile.kyc_status = :status', { status: KycStatus.PENDING })
+      .orderBy('user.createdAt', 'DESC');
+    
+    const users = await qb.getMany();
+    return users.map(u => this.toPublicProfile(u));
+  }
+
+  async reviewKyc(targetId: number, status: KycStatus, reason?: string) {
+    const user = await this.userRepo.findOne({
+      where: { id: targetId },
+      relations: ['instructorProfile'],
+    });
+    if (!user || !user.instructorProfile) throw new NotFoundException('Không tìm thấy giảng viên hoặc KYC');
+    
+    user.instructorProfile.kycStatus = status;
+    user.instructorProfile.rejectionReason = reason || '';
+    await this.instructorProfileRepo.save(user.instructorProfile);
+    
+    return this.toPublicProfile(user);
+  }
+
   async findAll(opts: {
     page: number;
     limit: number;
@@ -211,12 +238,13 @@ export class UsersService {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('user.profile', 'profile')
+      .leftJoinAndSelect('user.instructorProfile', 'instructorProfile')
       .orderBy('user.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
 
     if (role) {
-      qb.andWhere('role.role_name = :role', { role });
+      qb.andWhere('role.role_name = :role', { role: role as string });
     }
     if (status) {
       qb.andWhere('user.status = :status', { status });
@@ -224,6 +252,9 @@ export class UsersService {
     if (search) {
       qb.andWhere('user.email ILIKE :search', { search: `%${search}%` });
     }
+
+    // Admin không quản lý Admin
+    qb.andWhere('role.role_name != :adminRole', { adminRole: 'ADMIN' });
 
     const [users, total] = await qb.getManyAndCount();
 
@@ -259,10 +290,47 @@ export class UsersService {
     if (target.id === requestor.id) {
       throw new ForbiddenException('Không thể tự thay đổi trạng thái của chính mình');
     }
+    if (target.role?.roleName === 'ADMIN') {
+      throw new ForbiddenException('Không thể thay đổi trạng thái của Quản trị viên khác');
+    }
 
     target.status = dto.status;
+
+    if (dto.status === UserStatus.ACTIVE) {
+      // Unban: xóa lý do ban, ghi thời điểm unban
+      target.banReason = null;
+      target.bannedAt = null;
+      target.unbannedAt = new Date();
+    } else {
+      // Ban/Suspend thủ công: ghi lý do và thời điểm ban
+      target.banReason = dto.reason ?? null;
+      target.bannedAt = new Date();
+      target.unbannedAt = null;
+    }
+
     await this.userRepo.save(target);
     return this.toPublicProfile(target);
+  }
+
+  async incrementViolationCount(userId: number, reason: string): Promise<any> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: ['role'],
+    });
+    if (!user) throw new NotFoundException(`Không tìm thấy user #${userId}`);
+
+    user.violationCount += 1;
+
+    // Tự động suspend khi đạt ngưỡng >= 2 vi phạm
+    if (user.violationCount >= 2 && user.status === UserStatus.ACTIVE) {
+      user.status = UserStatus.SUSPENDED;
+      user.banReason = `Hệ thống tự động đình chỉ: tài khoản đạt ${user.violationCount} lần vi phạm. Lý do gần nhất: ${reason}`;
+      user.bannedAt = new Date();
+      user.unbannedAt = null;
+    }
+
+    await this.userRepo.save(user);
+    return this.toPublicProfile(user);
   }
 
   async updateRole(
@@ -278,6 +346,9 @@ export class UsersService {
     if (target.id === requestor.id) {
       throw new ForbiddenException('Không thể tự thay đổi role của chính mình');
     }
+    if (target.role?.roleName === 'ADMIN') {
+      throw new ForbiddenException('Không thể thay đổi role của Quản trị viên khác');
+    }
 
     const role = await this.roleRepo.findOne({ where: { id: dto.roleId } });
     if (!role) throw new NotFoundException(`Không tìm thấy role #${dto.roleId}`);
@@ -290,10 +361,13 @@ export class UsersService {
 
   // ─── Xóa User ───────────────────────────────────────────────────────────────
 
-  async deleteUser(id: number) {
-    const user = await this.userRepo.findOne({ where: { id } });
+  async deleteUser(id: number, requestor?: User) {
+    const user = await this.userRepo.findOne({ where: { id }, relations: ['role'] });
     if (!user) {
       throw new NotFoundException(`Không tìm thấy user #${id}`);
+    }
+    if (user.role?.roleName === 'ADMIN') {
+      throw new ForbiddenException('Không thể xóa Quản trị viên khác');
     }
 
     // 1. Xóa trên Clerk để giải phóng Email
@@ -305,8 +379,8 @@ export class UsersService {
       // Vẫn tiếp tục thực hiện xóa local để đảm bảo đồng bộ
     }
 
-    // 2. Xóa trong CSDL Local (sẽ tự động cascade xóa các dữ liệu liên quan)
-    await this.userRepo.delete(id);
+    // 2. Xóa trong CSDL Local (Soft delete - cập nhật status hoặc deleteDate)
+    await this.userRepo.softDelete(id);
     return { id };
   }
 
@@ -329,6 +403,9 @@ export class UsersService {
       roleId: user.roleId,
       status: user.status,
       violationCount: user.violationCount,
+      banReason: user.banReason ?? null,
+      bannedAt: user.bannedAt ?? null,
+      unbannedAt: user.unbannedAt ?? null,
       instructorProfile: user.instructorProfile ? {
         bankName: user.instructorProfile.bankName,
         kycStatus: user.instructorProfile.kycStatus,

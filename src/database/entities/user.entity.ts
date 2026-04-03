@@ -8,6 +8,7 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   Index,
 } from 'typeorm';
 import { Role } from './role.entity';
@@ -67,9 +68,21 @@ export class User {
   })
   status: UserStatus;
 
+  @Column({ type: 'text', nullable: true, name: 'ban_reason' })
+  banReason: string | null;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'banned_at' })
+  bannedAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'unbanned_at' })
+  unbannedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at' })
+  deletedAt: Date;
 }
