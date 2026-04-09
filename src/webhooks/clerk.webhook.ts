@@ -113,7 +113,7 @@ export class ClerkWebhookController {
       if (roleNameToFind === 'INSTRUCTOR') {
         await this.instructorProfileRepo.save({
           userId: newUser.id,
-          kycStatus: KycStatus.PENDING,
+          kycStatus: KycStatus.UNSUBMITTED,
         });
       }
 

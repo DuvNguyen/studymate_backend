@@ -9,6 +9,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { User } from './database/entities/user.entity';
 import { Role } from './database/entities/role.entity';
 
@@ -33,6 +34,7 @@ import { Role } from './database/entities/role.entity';
     AuthModule,
     UsersModule,
     WebhooksModule,
+    UploadsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

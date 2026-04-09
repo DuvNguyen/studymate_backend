@@ -89,7 +89,9 @@ export class UsersService {
     });
 
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-    if (user.roleId !== 2) throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên');
+    if (!['INSTRUCTOR', 'USER'].includes(user.role?.roleName || '')) {
+      throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên hoặc Tài khoản đang chờ cấp phép');
+    }
 
     let profile = user.instructorProfile;
     if (!profile) {
@@ -118,7 +120,9 @@ export class UsersService {
     });
 
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-    if (user.roleId !== 2) throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên');
+    if (!['INSTRUCTOR', 'USER'].includes(user.role?.roleName || '')) {
+      throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên hoặc Tài khoản đang chờ cấp phép');
+    }
 
     let profile = user.instructorProfile;
     if (!profile) {
@@ -213,13 +217,39 @@ export class UsersService {
   async reviewKyc(targetId: number, status: KycStatus, reason?: string) {
     const user = await this.userRepo.findOne({
       where: { id: targetId },
-      relations: ['instructorProfile'],
+      relations: ['instructorProfile', 'role'],
     });
     if (!user || !user.instructorProfile) throw new NotFoundException('Không tìm thấy giảng viên hoặc KYC');
     
     user.instructorProfile.kycStatus = status;
     user.instructorProfile.rejectionReason = reason || '';
     await this.instructorProfileRepo.save(user.instructorProfile);
+
+    // Nếu Approve, cập nhật Role của User lên INSTRUCTOR
+    if (status === KycStatus.APPROVED) {
+      const instructorRole = await this.roleRepo.findOne({ where: { roleName: 'INSTRUCTOR' }});
+      if (instructorRole && user.roleId !== instructorRole.id) {
+        user.roleId = instructorRole.id;
+        user.role = instructorRole;
+        await this.userRepo.save(user);
+
+        // Sync cho Clerk SDK
+        try {
+          const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+          await clerk.users.updateUserMetadata(user.clerkUserId, {
+            publicMetadata: { role: 'INSTRUCTOR' },
+          });
+        } catch (e: any) {
+          console.warn('[reviewKyc] Failed to sync Clerk Metadata:', e.message);
+        }
+      }
+    } else if (status === KycStatus.REJECTED) {
+      // Nếu REJECTED và user vẫn chỉ trơ trọi quyền USER (chưa từng duyệt bao giờ) => xóa trắng tài khoản.
+      if (user.role?.roleName === 'USER') {
+        await this.deleteUser(targetId);
+        return { message: 'Tài khoản giả mạo/không hợp lệ đã bị xóa khỏi hệ thống.' };
+      }
+    }
     
     return this.toPublicProfile(user);
   }
