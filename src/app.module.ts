@@ -10,6 +10,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { CoursesModule } from './modules/courses/courses.module';
+import { VideosModule } from './modules/videos/videos.module';
 import { User } from './database/entities/user.entity';
 import { Role } from './database/entities/role.entity';
 
@@ -35,6 +38,9 @@ import { Role } from './database/entities/role.entity';
     UsersModule,
     WebhooksModule,
     UploadsModule,
+    CategoriesModule,
+    CoursesModule,
+    VideosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -1,0 +1,15 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Course } from '../../database/entities/course.entity';
+import { Category } from '../../database/entities/category.entity';
+import { Video } from '../../database/entities/video.entity';
+import { CoursesController } from './courses.controller';
+import { CoursesService } from './courses.service';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Course, Category, Video])],
+  controllers: [CoursesController],
+  providers: [CoursesService],
+  exports: [CoursesService],
+})
+export class CoursesModule {}

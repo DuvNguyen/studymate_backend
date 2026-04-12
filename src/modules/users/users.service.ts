@@ -211,7 +211,18 @@ export class UsersService {
       .orderBy('user.createdAt', 'DESC');
     
     const users = await qb.getMany();
-    return users.map(u => this.toPublicProfile(u));
+    return users.map(u => {
+      const publicProfile = this.toPublicProfile(u);
+      return {
+        ...publicProfile,
+        instructorProfile: u.instructorProfile ? {
+          ...publicProfile.instructorProfile,
+          idCardUrl: u.instructorProfile.idCardUrl,
+          bankAccountName: u.instructorProfile.bankAccountName,
+          bankAccountNumber: u.instructorProfile.bankAccountNumber,
+        } : null,
+      };
+    });
   }
 
   async reviewKyc(targetId: number, status: KycStatus, reason?: string) {
