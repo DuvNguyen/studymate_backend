@@ -35,4 +35,8 @@ export class UpdateKycDto {
   @ValidateNested({ each: true })
   @Type(() => InstructorDocumentDto)
   documents?: InstructorDocumentDto[];
+
+  @IsOptional()
+  @IsArray()
+  certificates?: any[];
 }

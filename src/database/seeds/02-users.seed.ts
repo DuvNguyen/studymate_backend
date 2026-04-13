@@ -33,7 +33,7 @@ export async function seedUsers(dataSource: DataSource) {
     },
     {
       clerkUserId: 'seed_instructor_002',
-      email: 'tran.thi.bich@studymate.vn',
+      email: 'nguyen.thi.bich.nguyen@studymate.vn',
       roleId: roleInstructor.id,
     },
     {

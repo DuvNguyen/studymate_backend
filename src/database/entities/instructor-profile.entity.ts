@@ -10,6 +10,7 @@ import {
 import { User } from './user.entity';
 
 export enum KycStatus {
+  UNSUBMITTED = 'UNSUBMITTED',
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
@@ -37,9 +38,8 @@ export class InstructorProfile {
   bankName: string;
 
   @Column({
-    type: 'enum',
-    enum: KycStatus,
-    default: KycStatus.PENDING,
+    type: 'varchar',
+    default: KycStatus.UNSUBMITTED,
     name: 'kyc_status',
   })
   kycStatus: KycStatus;
@@ -52,6 +52,9 @@ export class InstructorProfile {
 
   @Column({ type: 'timestamp', nullable: true, name: 'approved_at' })
   approvedAt: Date;
+
+  @Column({ type: 'jsonb', nullable: true, name: 'certificates' })
+  certificates: any[];
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;

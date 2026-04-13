@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Put,
+  Delete,
   Param,
   Body,
   Query,
@@ -15,6 +16,7 @@ import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { ClerkUserId, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
+import { UpdateStaffProfileDto } from './dto/update-staff-profile.dto';
 import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -63,7 +65,46 @@ export class UsersController {
     return { data: kycData, message: 'Cập nhật KYC thành công' };
   }
 
+  // ─── Staff Profile ─────────────────────────────────────────────────────────
+
+  /** GET /api/v1/users/me/staff */
+  @Get('me/staff')
+  async getStaffProfile(@ClerkUserId() clerkUserId: string) {
+    const profile = await this.usersService.getStaffProfile(clerkUserId);
+    return { data: profile, message: 'Lấy thông tin nhân viên thành công' };
+  }
+
+  /** PUT /api/v1/users/me/staff */
+  @Put('me/staff')
+  async updateStaffProfile(
+    @ClerkUserId() clerkUserId: string,
+    @Body() dto: UpdateStaffProfileDto,
+  ) {
+    const profile = await this.usersService.updateStaffProfile(clerkUserId, dto);
+    return { data: profile, message: 'Cập nhật thông tin nhân viên thành công' };
+  }
+
   // ─── Admin – danh sách & chi tiết ──────────────────────────────────────────
+
+  /** GET /api/v1/users/kyc-pending */
+  @Roles('ADMIN', 'STAFF')
+  @Get('kyc-pending')
+  async getPendingKyc() {
+    const result = await this.usersService.getPendingKyc();
+    return { data: result, message: 'Lấy danh sách KYC chờ duyệt thành công' };
+  }
+
+  /** PATCH /api/v1/users/:id/kyc-status */
+  @Roles('ADMIN', 'STAFF')
+  @Patch(':id/kyc-status')
+  async reviewKyc(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('status') status: any,
+    @Body('reason') reason?: string,
+  ) {
+    const result = await this.usersService.reviewKyc(id, status, reason);
+    return { data: result, message: 'Đã cập nhật trạng thái KYC' };
+  }
 
   /**
    * GET /api/v1/users
@@ -120,5 +161,13 @@ export class UsersController {
   ) {
     const user = await this.usersService.updateRole(id, dto, requestor);
     return { data: user, message: 'Cập nhật role thành công' };
+  }
+
+  /** DELETE /api/v1/users/:id */
+  @Roles('ADMIN')
+  @Delete(':id')
+  async deleteUser(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestor: User) {
+    const result = await this.usersService.deleteUser(id, requestor);
+    return { data: result, message: 'Xóa hệ thống và Clerk thành công' };
   }
 }

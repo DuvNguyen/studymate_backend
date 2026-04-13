@@ -8,6 +8,7 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   Index,
 } from 'typeorm';
 import { Role } from './role.entity';
@@ -15,6 +16,7 @@ import { Profile } from './profile.entity';
 import { InstructorProfile } from './instructor-profile.entity';
 import { InstructorDocument } from './instructor-document.entity';
 import { StaffProfile } from './staff-profile.entity';
+import { Course } from './course.entity';
 
 export enum UserStatus {
   ACTIVE = 'ACTIVE',
@@ -55,6 +57,9 @@ export class User {
   @OneToMany(() => InstructorDocument, (doc) => doc.user, { cascade: true })
   instructorDocuments: InstructorDocument[];
 
+  @OneToMany(() => Course, (course) => course.instructor)
+  courses: Course[];
+
   @Column({ nullable: true, name: 'avatar_url' })
   avatarUrl: string;
 
@@ -67,9 +72,21 @@ export class User {
   })
   status: UserStatus;
 
+  @Column({ type: 'text', nullable: true, name: 'ban_reason' })
+  banReason: string | null;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'banned_at' })
+  bannedAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'unbanned_at' })
+  unbannedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at' })
+  deletedAt: Date;
 }

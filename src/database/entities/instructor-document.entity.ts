@@ -28,8 +28,7 @@ export class InstructorDocument {
   user: User;
 
   @Column({
-    type: 'enum',
-    enum: DocumentType,
+    type: 'varchar',
     name: 'document_type',
   })
   documentType: DocumentType;
