@@ -8,6 +8,8 @@ import {
   CourseResponseDto,
   CourseInstructorDto,
   CourseCategoryDto,
+  SectionDto,
+  LessonDto,
   PaginatedCoursesDto,
   PaginationMetaDto,
 } from './dto/course-response.dto';
@@ -58,6 +60,38 @@ export class CoursesService {
     category.name = course.category?.name;
     category.slug = course.category?.slug;
     dto.category = category;
+
+    if (course.sections) {
+      dto.sections = course.sections
+        .sort((a, b) => a.position - b.position)
+        .map((s) => {
+          const sectionDto = new SectionDto();
+          sectionDto.id = s.id;
+          sectionDto.title = s.title;
+          sectionDto.position = s.position;
+          
+          if (s.lessons) {
+            sectionDto.lessons = s.lessons
+              .sort((a, b) => a.position - b.position)
+              .map((l) => {
+                const lessonDto = new LessonDto();
+                lessonDto.id = l.id;
+                lessonDto.title = l.title;
+                lessonDto.durationSecs = l.durationSecs;
+                lessonDto.isPreview = l.isPreview;
+                lessonDto.position = l.position;
+                lessonDto.youtubeVideoId = l.isPreview && l.video ? l.video.youtubeVideoId : null;
+                return lessonDto;
+              });
+          } else {
+            sectionDto.lessons = [];
+          }
+          
+          return sectionDto;
+        });
+    } else {
+      dto.sections = [];
+    }
 
     return dto;
   }
@@ -143,7 +177,7 @@ export class CoursesService {
   async findBySlug(slug: string): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({
       where: { slug, status: CourseStatus.PUBLISHED },
-      relations: ['instructor', 'instructor.profile', 'category'],
+      relations: ['instructor', 'instructor.profile', 'category', 'sections', 'sections.lessons', 'sections.lessons.video'],
     });
 
     if (!course) {

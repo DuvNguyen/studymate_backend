@@ -10,13 +10,18 @@ import { StaffProfile } from '../entities/staff-profile.entity';
 import { seedRoles } from './01-roles.seed';
 import { seedUsers } from './02-users.seed';
 import { seedCategories } from './03-categories.seed';
+import { seedSampleCourse } from './04-courses.seed';
+import { Course } from '../entities/course.entity';
+import { Section } from '../entities/section.entity';
+import { Lesson } from '../entities/lesson.entity';
+import { Video } from '../entities/video.entity';
 
 // Khởi tạo kết nối DB trực tiếp — không qua NestJS
 const dataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  entities: [User, Role, Category, Profile, InstructorProfile, InstructorDocument, StaffProfile],
+  entities: [User, Role, Category, Profile, InstructorProfile, InstructorDocument, StaffProfile, Course, Section, Lesson, Video],
   synchronize: true, // tự tạo bảng nếu chưa có (chỉ dùng khi seed)
 });
 
@@ -35,6 +40,9 @@ async function runSeeds() {
 
   console.log('\n3. Khởi tạo danh mục khóa học...');
   await seedCategories(dataSource);
+
+  console.log('\n4. Khởi tạo khóa học mẫu...');
+  await seedSampleCourse(dataSource);
 
   await dataSource.destroy();
 

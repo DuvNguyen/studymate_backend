@@ -1,5 +1,40 @@
 import { Expose, Type } from 'class-transformer';
 
+export class LessonDto {
+  @Expose()
+  id: number;
+
+  @Expose()
+  title: string;
+
+  @Expose()
+  durationSecs: number;
+
+  @Expose()
+  isPreview: boolean;
+
+  @Expose()
+  youtubeVideoId: string | null;
+
+  @Expose()
+  position: number;
+}
+
+export class SectionDto {
+  @Expose()
+  id: number;
+
+  @Expose()
+  title: string;
+
+  @Expose()
+  position: number;
+
+  @Expose()
+  @Type(() => LessonDto)
+  lessons: LessonDto[];
+}
+
 export class CourseInstructorDto {
   @Expose()
   id: number;
@@ -84,6 +119,10 @@ export class CourseResponseDto {
   @Expose()
   @Type(() => CourseCategoryDto)
   category: CourseCategoryDto;
+
+  @Expose()
+  @Type(() => SectionDto)
+  sections: SectionDto[];
 }
 
 export class PaginationMetaDto {

@@ -12,6 +12,7 @@ import {
 import { User } from './user.entity';
 import { Category } from './category.entity';
 import { Video } from './video.entity';
+import { Section } from './section.entity';
 
 export enum CourseStatus {
   DRAFT = 'DRAFT',
@@ -57,6 +58,9 @@ export class Course {
   previewVideo: Video | null;
 
   // ── Thông tin cơ bản ──────────────────────────────────────────
+
+  @OneToMany(() => Section, (section) => section.course)
+  sections: Section[];
 
   @Column({ type: 'varchar', unique: true })
   title: string;
