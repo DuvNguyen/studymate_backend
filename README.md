@@ -1,98 +1,87 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# StudyMate - Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+StudyMate là hệ thống quản lý học tập (LMS) hiện đại, hỗ trợ đa vai trò người dùng và quy trình làm việc chuyên nghiệp giữa Học viên, Giảng viên và Quản trị viên. Đây là kho lưu trữ mã nguồn cho phần Backend của hệ thống.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🚀 Công nghệ sử dụng
 
-## Description
+Hệ thống được xây dựng trên nền tảng NestJS với kiến trúc mạnh mẽ và có khả năng mở rộng:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **Framework**: [NestJS 11+](https://nestjs.com/) (Node.js)
+- **Database**: [PostgreSQL](https://www.postgresql.org/) (Sử dụng [Neon DB](https://neon.tech/))
+- **ORM**: [TypeORM](https://typeorm.io/)
+- **Authentication**: [Clerk Auth](https://clerk.com/) (JWT & Social Login)
+- **Media Storage**: [Cloudinary](https://cloudinary.com/)
+- **Webhook Integration**: [Svix](https://www.svix.com/) (Xác thực chữ ký Clerk Webhook)
+- **Security**: Helmet, Throttler, CORS, ValidationPipe
+- **Video Hosting**: YouTube Data API v3 (Centralized Channel)
 
-## Project setup
+## 🏗️ Kiến trúc Hệ thống
 
-```bash
-$ npm install
+Backend tuân thủ nghiêm ngặt mô hình Layered Architecture:
+
+```text
+Request (JWT) -> Guard (Roles) -> Controller -> Service -> Repository -> Database
 ```
 
-## Compile and run the project
+- **ClerkAuthGuard**: Xác thực token JWT từ Clerk và gán thông tin người dùng vào request.
+- **Service Pattern**: Chứa 100% logic nghiệp vụ. Không query trực tiếp trong controller.
+- **Repository Pattern**: Quản lý các thao tác với cơ sở dữ liệu và khai báo các quan hệ (relations).
+- **DTO (Data Transfer Objects)**: Sử dụng `class-validator` để kiểm soát dữ liệu input/output.
+
+## 📂 Các Module Chính
+
+- `auth`: Xử lý xác thực và đồng bộ người dùng từ Clerk qua Webhooks.
+- `users`: Quản lý thông tin cá nhân, hồ sơ Giảng viên (KYC), và Staff.
+- `categories`: Hệ thống danh mục khóa học phân cấp đa tầng.
+- `courses`: Quản lý khóa học, lộ trình học tập và phê duyệt.
+- `lessons`: Bài học, nội dung chi tiết và media.
+- `quizzes`: Hệ thống bài kiểm tra và đánh giá học viên.
+- `orders & enrollments`: Quy trình thanh toán, tạo đơn hàng và ghi danh khóa học.
+- `wallets`: Quản lý số dư và doanh thu cho Giảng viên.
+- `uploads`: Module dùng chung để xử lý file lên Cloudinary.
+
+## 🛠️ Cài đặt và Chạy Project
+
+### 1. Yêu cầu hệ thống
+- Node.js 20+
+- PostgreSQL (hoặc Neon DB URL)
+
+### 2. Cấu hình môi trường
+Tạo file `.env` từ `.env.example` và điền đầy đủ các thông tin:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
+Cần chú ý các khóa quan trọng từ Clerk, Cloudinary và Neon DB.
 
+### 3. Cài đặt dependency
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
+### 4. Chạy ứng dụng
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Development mode
+npm run start:dev
+
+# Production mode
+npm run build
+npm run start:prod
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 5. Database Seed (Dữ liệu mẫu)
+```bash
+npm run seed
+```
 
-## Resources
+## 🔐 Workflow Quan trọng
 
-Check out a few resources that may come in handy when working with NestJS:
+1. **KYC Giảng viên**: Giảng viên nộp hồ sơ (`InstructorDocument`) -> Staff duyệt -> Tài khoản được kích hoạt quyền tạo khóa học.
+2. **Phê duyệt Khóa học**: Course được tạo -> Gửi yêu cầu phê duyệt -> Staff kiểm tra nội dung -> Public khóa học.
+3. **Đồng bộ User**: Khi người dùng đăng ký trên UI (Clerk) -> Clerk gửi webhook -> Backend nhận và tạo bản ghi tương ứng trong bảng `users` tại database local.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+---
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 📄 License
+Project này được phát triển nội bộ cho StudyMate. Mọi hình thức sao chép cần được sự đồng ý của tác giả.
