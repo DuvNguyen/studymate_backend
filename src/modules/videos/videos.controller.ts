@@ -8,6 +8,7 @@ import {
   BadRequestException,
   Get,
   Param,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -84,8 +85,11 @@ export class VideosController {
    */
   @Get('instructor')
   @Roles('INSTRUCTOR', 'ADMIN')
-  async getInstructorVideos(@CurrentUser() user: User): Promise<VideoResponseDto[]> {
-    return this.videosService.getInstructorVideos(user.id);
+  async getInstructorVideos(
+    @CurrentUser() user: User,
+    @Query('status') status?: VideoStatus,
+  ): Promise<VideoResponseDto[]> {
+    return this.videosService.getInstructorVideos(user.id, status);
   }
 
   /**

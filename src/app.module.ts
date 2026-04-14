@@ -14,6 +14,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { CoursesModule } from './modules/courses/courses.module';
 import { VideosModule } from './modules/videos/videos.module';
+import { SectionsModule } from './modules/sections/sections.module';
+import { LessonsModule } from './modules/lessons/lessons.module';
 import { User } from './database/entities/user.entity';
 import { Role } from './database/entities/role.entity';
 
@@ -43,6 +45,8 @@ import { Role } from './database/entities/role.entity';
     CategoriesModule,
     CoursesModule,
     VideosModule,
+    SectionsModule,
+    LessonsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

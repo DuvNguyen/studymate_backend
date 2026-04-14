@@ -125,9 +125,13 @@ export class VideosService {
 
   // ─── Controller Methods ────────────────────────────────────────────────────
 
-  async getInstructorVideos(instructorId: number): Promise<VideoResponseDto[]> {
+  async getInstructorVideos(instructorId: number, status?: VideoStatus): Promise<VideoResponseDto[]> {
+    const whereCondition: any = { uploaderId: instructorId };
+    if (status) {
+      whereCondition.status = status;
+    }
     const videos = await this.videosRepository.find({
-      where: { uploaderId: instructorId },
+      where: whereCondition,
       order: { uploadedAt: 'DESC' },
     });
     return videos.map((v) => this.toDto(v));
