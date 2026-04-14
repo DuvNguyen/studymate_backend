@@ -20,6 +20,15 @@ export class VideoResponseDto {
   durationSecs: number | null;
 
   @Expose()
+  title: string | null;
+
+  @Expose()
+  definition: string | null;
+
+  @Expose()
+  rejectReason: string | null;
+
+  @Expose()
   fileSizeKb: number | null;
 
   @Expose()
