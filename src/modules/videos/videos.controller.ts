@@ -6,14 +6,20 @@ import {
   UseInterceptors,
   Body,
   BadRequestException,
+  Get,
+  Param,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { VideosService } from './videos.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '../../database/entities/user.entity';
+import { User, UserStatus } from '../../database/entities/user.entity';
 import { VideoResponseDto } from './dto/video-response.dto';
+import { VideoStatus } from '../../database/entities/video.entity';
 
 /** Tối đa 500MB per upload */
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
@@ -28,6 +34,7 @@ const ALLOWED_MIMES = [
 ];
 
 @Controller('videos')
+@UseGuards(ClerkAuthGuard, RolesGuard)
 export class VideosController {
   constructor(private readonly videosService: VideosService) {}
 
@@ -41,7 +48,7 @@ export class VideosController {
    *   - title?: string — tiêu đề video (optional, mặc định dùng tên file)
    */
   @Post('upload')
-  @UseGuards(ClerkAuthGuard)
+  @Roles('INSTRUCTOR', 'ADMIN')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(), // Giữ trong RAM — stream thẳng lên YouTube
@@ -70,5 +77,43 @@ export class VideosController {
     }
 
     return this.videosService.uploadToYoutube(file, user.id, title);
+  }
+
+  /**
+   * GET /api/v1/videos/instructor
+   * Giảng viên lấy danh sách video do mình upload
+   */
+  @Get('instructor')
+  @Roles('INSTRUCTOR', 'ADMIN')
+  async getInstructorVideos(
+    @CurrentUser() user: User,
+    @Query('status') status?: VideoStatus,
+  ): Promise<VideoResponseDto[]> {
+    return this.videosService.getInstructorVideos(user.id, status);
+  }
+
+  /**
+   * GET /api/v1/videos/pending
+   * Staff/Admin lấy danh sách video đang chờ duyệt
+   */
+  @Get('pending')
+  @Roles('STAFF', 'ADMIN')
+  async getPendingVideos(): Promise<VideoResponseDto[]> {
+    return this.videosService.getPendingVideos();
+  }
+
+  /**
+   * PATCH /api/v1/videos/:id/review
+   * Staff/Admin duyệt video (Approve hoặc Reject)
+   */
+  @Post(':id/review')
+  @Roles('STAFF', 'ADMIN')
+  async reviewVideo(
+    @Param('id') id: number,
+    @CurrentUser() user: User,
+    @Body('status') status: VideoStatus,
+    @Body('reason') reason?: string,
+  ): Promise<VideoResponseDto> {
+    return this.videosService.reviewVideo(id, user.id, status, reason);
   }
 }

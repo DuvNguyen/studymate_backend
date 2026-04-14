@@ -10,7 +10,8 @@ import {
 import { User } from './user.entity';
 
 export enum VideoStatus {
-  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  PENDING_REVIEW = 'PENDING_REVIEW',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
 }
@@ -35,6 +36,14 @@ export class Video {
   @Column({ type: 'varchar', name: 'storage_key' })
   storageKey: string;
 
+  /** Tên gốc của video khi upload */
+  @Column({ type: 'varchar', nullable: true })
+  title: string | null;
+
+  /** Định dạng chất lượng video từ YouTube (hd, sd) */
+  @Column({ type: 'varchar', nullable: true })
+  definition: string | null;
+
   /**
    * CDN/embed URL — chỉ có giá trị sau khi status = APPROVED.
    * Với YouTube: "https://www.youtube.com/embed/{videoId}"
@@ -53,7 +62,7 @@ export class Video {
   fileSizeKb: number | null;
 
   @Index('idx_videos_status')
-  @Column({ type: 'varchar', default: VideoStatus.PENDING })
+  @Column({ type: 'varchar', default: VideoStatus.PROCESSING })
   status: VideoStatus;
 
   @Column({ name: 'reviewed_by', nullable: true })

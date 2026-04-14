@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Course, CourseStatus } from '../../database/entities/course.entity';
 import { Category } from '../../database/entities/category.entity';
 import { CourseQueryDto } from './dto/course-query.dto';
+import { CreateCourseDto } from './dto/create-course.dto';
+import { UpdateCourseDto } from './dto/update-course.dto';
 import {
   CourseResponseDto,
   CourseInstructorDto,
@@ -185,5 +187,56 @@ export class CoursesService {
     }
 
     return this.toDto(course);
+  }
+
+  // ── Instructor Methods ──────────────────────────────────────────
+
+  async findByInstructor(instructorId: number): Promise<CourseResponseDto[]> {
+    const courses = await this.coursesRepository.find({
+      where: { instructorId },
+      relations: ['category'],
+      order: { createdAt: 'DESC' },
+    });
+    return courses.map((c) => this.toDto(c));
+  }
+
+  async findInstructorCourseDetail(instructorId: number, id: number): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({
+      where: { id, instructorId },
+      relations: ['category', 'sections', 'sections.lessons', 'sections.lessons.video'],
+    });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    return this.toDto(course);
+  }
+
+  async createCourse(instructorId: number, dto: CreateCourseDto): Promise<CourseResponseDto> {
+    const slug = dto.title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '') + '-' + Date.now();
+    const course = this.coursesRepository.create({
+      title: dto.title,
+      slug,
+      categoryId: dto.categoryId,
+      instructorId,
+      price: 0,
+    });
+    const saved = await this.coursesRepository.save(course);
+    return this.toDto(saved);
+  }
+
+  async updateCourse(instructorId: number, id: number, dto: UpdateCourseDto): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({ where: { id, instructorId } });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    
+    Object.assign(course, dto);
+    const saved = await this.coursesRepository.save(course);
+    return this.toDto(saved);
+  }
+
+  async submitCourseForReview(instructorId: number, id: number): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({ where: { id, instructorId } });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    
+    course.status = CourseStatus.PENDING_REVIEW;
+    const saved = await this.coursesRepository.save(course);
+    return this.toDto(saved);
   }
 }
