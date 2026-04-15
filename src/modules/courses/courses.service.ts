@@ -15,6 +15,7 @@ import {
   PaginatedCoursesDto,
   PaginationMetaDto,
 } from './dto/course-response.dto';
+import { RejectCourseDto } from './dto/course-approval.dto';
 
 @Injectable()
 export class CoursesService {
@@ -235,7 +236,81 @@ export class CoursesService {
     const course = await this.coursesRepository.findOne({ where: { id, instructorId } });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
     
+    if (course.status === CourseStatus.PENDING_REVIEW || course.status === CourseStatus.PUBLISHED) {
+      throw new Error('Khóa học không ở trạng thái hợp lệ để gửi duyệt');
+    }
+
     course.status = CourseStatus.PENDING_REVIEW;
+    course.rejectionReason = null; // Clear old reason
+    const saved = await this.coursesRepository.save(course);
+    return this.toDto(saved);
+  }
+
+  // ── Admin Methods ──────────────────────────────────────────
+
+  async findAllForAdmin(page: number = 1, limit: number = 10, status?: CourseStatus): Promise<PaginatedCoursesDto> {
+    const skip = (page - 1) * limit;
+
+    const qb = this.coursesRepository
+      .createQueryBuilder('course')
+      .leftJoinAndSelect('course.instructor', 'instructor')
+      .leftJoinAndSelect('instructor.profile', 'profile')
+      .leftJoinAndSelect('course.category', 'category')
+      .leftJoinAndSelect('course.sections', 'sections')
+      .leftJoinAndSelect('sections.lessons', 'lessons')
+      .leftJoinAndSelect('lessons.video', 'video');
+
+    if (status) {
+      qb.andWhere('course.status = :status', { status });
+    }
+
+    qb.orderBy('course.updatedAt', 'DESC')
+      .addOrderBy('course.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [courses, total] = await qb.getManyAndCount();
+
+    const meta = Object.assign(new PaginationMetaDto(), {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+
+    const result = new PaginatedCoursesDto();
+    result.data = courses.map((c) => this.toDto(c));
+    result.meta = meta;
+    return result;
+  }
+
+  async approveCourse(id: number, adminId: number): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({ where: { id } });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    
+    if (course.status !== CourseStatus.PENDING_REVIEW) {
+      throw new Error('Khóa học không ở trạng thái chờ duyệt');
+    }
+
+    course.status = CourseStatus.PUBLISHED;
+    course.publishedAt = new Date();
+    course.rejectionReason = null;
+    
+    const saved = await this.coursesRepository.save(course);
+    return this.toDto(saved);
+  }
+
+  async rejectCourse(id: number, adminId: number, dto: RejectCourseDto): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({ where: { id } });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    
+    if (course.status !== CourseStatus.PENDING_REVIEW) {
+      throw new Error('Khóa học không ở trạng thái chờ duyệt');
+    }
+
+    course.status = CourseStatus.REJECTED;
+    course.rejectionReason = dto.reason;
+    
     const saved = await this.coursesRepository.save(course);
     return this.toDto(saved);
   }

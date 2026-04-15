@@ -8,11 +8,12 @@ import { Lesson } from '../../database/entities/lesson.entity';
 import { User } from '../../database/entities/user.entity';
 import { CoursesController } from './courses.controller';
 import { InstructorCoursesController } from './instructor-courses.controller';
+import { AdminCoursesController } from './admin-courses.controller';
 import { CoursesService } from './courses.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Course, Category, Video, Section, Lesson, User])],
-  controllers: [CoursesController, InstructorCoursesController],
+  controllers: [CoursesController, InstructorCoursesController, AdminCoursesController],
   providers: [CoursesService],
   exports: [CoursesService],
 })
