@@ -6,6 +6,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CourseStatus } from '../../database/entities/course.entity';
 import { RejectCourseDto } from './dto/course-approval.dto';
 
+import { CourseQueryDto } from './dto/course-query.dto';
+
 @Controller('admin/courses')
 @UseGuards(ClerkAuthGuard, RolesGuard)
 @Roles('ADMIN', 'STAFF')
@@ -13,16 +15,13 @@ export class AdminCoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
   @Get()
-  async getCourses(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
-    @Query('status') status: CourseStatus,
-  ) {
-    return this.coursesService.findAllForAdmin(
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 10,
-      status,
-    );
+  async getCourses(@Query() query: CourseQueryDto) {
+    return this.coursesService.findAllForAdmin(query);
+  }
+
+  @Put(':id/suspend')
+  async suspendCourse(@Req() req, @Param('id') id: string, @Body() dto: RejectCourseDto) {
+    return this.coursesService.suspendCourse(parseInt(id, 10), req.user.id, dto);
   }
 
   @Put(':id/approve')

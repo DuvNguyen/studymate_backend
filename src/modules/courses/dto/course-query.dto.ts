@@ -8,12 +8,21 @@ export class CourseQueryDto {
   categorySlug?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  categoryId?: number;
+
+  @IsOptional()
   @IsString()
   search?: string;
 
   @IsOptional()
   @IsEnum(CourseLevel)
   level?: CourseLevel;
+
+  @IsOptional()
+  @IsString()
+  status?: string; // Tách riêng, có thể truyền vào 'ALL', 'DRAFT', etc.
 
   @IsOptional()
   @Type(() => Number)

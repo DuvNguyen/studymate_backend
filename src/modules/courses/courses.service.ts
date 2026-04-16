@@ -96,6 +96,8 @@ export class CoursesService {
       dto.sections = [];
     }
 
+    dto.previewVideo = course.previewVideo ?? null;
+
     return dto;
   }
 
@@ -192,19 +194,90 @@ export class CoursesService {
 
   // ── Instructor Methods ──────────────────────────────────────────
 
-  async findByInstructor(instructorId: number): Promise<CourseResponseDto[]> {
-    const courses = await this.coursesRepository.find({
-      where: { instructorId },
-      relations: ['category'],
-      order: { createdAt: 'DESC' },
+  async findByInstructor(instructorId: number, query?: CourseQueryDto): Promise<PaginatedCoursesDto> {
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 12;
+    const skip = (page - 1) * limit;
+
+    const qb = this.coursesRepository
+      .createQueryBuilder('course')
+      .leftJoinAndSelect('course.category', 'category')
+      .where('course.instructorId = :instructorId', { instructorId });
+
+    if (query?.search) {
+      qb.andWhere('LOWER(course.title) LIKE LOWER(:search)', {
+        search: `%${query.search}%`,
+      });
+    }
+
+    if (query?.categoryId) {
+      const cat = await this.categoriesRepository.findOne({
+        where: { id: query.categoryId },
+        relations: ['children'],
+      });
+      if (cat) {
+        const categoryIds = [cat.id, ...cat.children.map((c) => c.id)];
+        qb.andWhere('course.categoryId IN (:...categoryIds)', { categoryIds });
+      } else {
+        qb.andWhere('1=0');
+      }
+    }
+    
+    // Quick handle status if provided. Note course-query has categorySlug.
+    if (query?.categorySlug) {
+      const cat = await this.categoriesRepository.findOne({
+        where: { slug: query.categorySlug },
+        relations: ['children'],
+      });
+      if (cat) {
+        const categoryIds = [cat.id, ...cat.children.map((c) => c.id)];
+        qb.andWhere('course.categoryId IN (:...categoryIds)', { categoryIds });
+      } else {
+        // category not found, return empty
+        qb.andWhere('1=0');
+      }
+    }
+
+    if (query?.status && query.status !== 'ALL') {
+      qb.andWhere('course.status = :status', { status: query.status });
+    }
+
+    // Default exclude archived unless explicitly requested or getting all
+    if (!query?.status || (query.status !== 'ALL' && query.status !== CourseStatus.ARCHIVED)) {
+      qb.andWhere('course.status != :archivedStatus', { archivedStatus: CourseStatus.ARCHIVED });
+    }
+
+    qb.orderBy('course.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [courses, total] = await qb.getManyAndCount();
+
+    const meta = Object.assign(new PaginationMetaDto(), {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     });
-    return courses.map((c) => this.toDto(c));
+
+    const result = new PaginatedCoursesDto();
+    result.data = courses.map((c) => this.toDto(c));
+    result.meta = meta;
+    return result;
+  }
+
+  async softDeleteCourse(instructorId: number, id: number): Promise<void> {
+    const course = await this.coursesRepository.findOne({ where: { id, instructorId } });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    
+    course.status = CourseStatus.ARCHIVED;
+    await this.coursesRepository.save(course);
   }
 
   async findInstructorCourseDetail(instructorId: number, id: number): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({
       where: { id, instructorId },
-      relations: ['category', 'sections', 'sections.lessons', 'sections.lessons.video'],
+      relations: ['category', 'previewVideo', 'sections', 'sections.lessons', 'sections.lessons.video'],
     });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
     return this.toDto(course);
@@ -217,7 +290,9 @@ export class CoursesService {
       slug,
       categoryId: dto.categoryId,
       instructorId,
-      price: 0,
+      price: dto.price,
+      originalPrice: dto.originalPrice || null,
+      level: dto.level,
     });
     const saved = await this.coursesRepository.save(course);
     return this.toDto(saved);
@@ -248,7 +323,9 @@ export class CoursesService {
 
   // ── Admin Methods ──────────────────────────────────────────
 
-  async findAllForAdmin(page: number = 1, limit: number = 10, status?: CourseStatus): Promise<PaginatedCoursesDto> {
+  async findAllForAdmin(query?: CourseQueryDto): Promise<PaginatedCoursesDto> {
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const qb = this.coursesRepository
@@ -260,8 +337,27 @@ export class CoursesService {
       .leftJoinAndSelect('sections.lessons', 'lessons')
       .leftJoinAndSelect('lessons.video', 'video');
 
-    if (status) {
-      qb.andWhere('course.status = :status', { status });
+    if (query?.search) {
+      qb.andWhere('LOWER(course.title) LIKE LOWER(:search)', {
+        search: `%${query.search}%`,
+      });
+    }
+
+    if (query?.categoryId) {
+      const cat = await this.categoriesRepository.findOne({
+        where: { id: query.categoryId },
+        relations: ['children'],
+      });
+      if (cat) {
+        const categoryIds = [cat.id, ...cat.children.map((c) => c.id)];
+        qb.andWhere('course.categoryId IN (:...categoryIds)', { categoryIds });
+      } else {
+        qb.andWhere('1=0');
+      }
+    }
+
+    if (query?.status && query.status !== 'ALL') {
+      qb.andWhere('course.status = :status', { status: query.status });
     }
 
     qb.orderBy('course.updatedAt', 'DESC')
@@ -308,6 +404,17 @@ export class CoursesService {
       throw new Error('Khóa học không ở trạng thái chờ duyệt');
     }
 
+    course.status = CourseStatus.REJECTED;
+    course.rejectionReason = dto.reason;
+    
+    const saved = await this.coursesRepository.save(course);
+    return this.toDto(saved);
+  }
+
+  async suspendCourse(id: number, adminId: number, dto: RejectCourseDto): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({ where: { id } });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    
     course.status = CourseStatus.REJECTED;
     course.rejectionReason = dto.reason;
     

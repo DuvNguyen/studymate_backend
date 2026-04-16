@@ -19,6 +19,7 @@ export enum CourseStatus {
   PENDING_REVIEW = 'PENDING_REVIEW',
   PUBLISHED = 'PUBLISHED',
   REJECTED = 'REJECTED',
+  ARCHIVED = 'ARCHIVED',
 }
 
 export enum CourseLevel {
