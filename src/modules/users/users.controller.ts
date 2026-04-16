@@ -86,12 +86,12 @@ export class UsersController {
 
   // ─── Admin – danh sách & chi tiết ──────────────────────────────────────────
 
-  /** GET /api/v1/users/kyc-pending */
+  /** GET /api/v1/users/kyc-requests */
   @Roles('ADMIN', 'STAFF')
-  @Get('kyc-pending')
-  async getPendingKyc() {
-    const result = await this.usersService.getPendingKyc();
-    return { data: result, message: 'Lấy danh sách KYC chờ duyệt thành công' };
+  @Get('kyc-requests')
+  async getKycRequests(@Query('status') status?: string) {
+    const result = await this.usersService.getKycRequests(status);
+    return { data: result, message: 'Lấy danh sách KYC thành công' };
   }
 
   /** PATCH /api/v1/users/:id/kyc-status */

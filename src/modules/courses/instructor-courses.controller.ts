@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { CourseQueryDto } from './dto/course-query.dto';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -13,8 +14,14 @@ export class InstructorCoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
   @Get()
-  async getMyCourses(@Req() req) {
-    return this.coursesService.findByInstructor(req.user.id);
+  async getMyCourses(@Req() req, @Query() query: CourseQueryDto) {
+    return this.coursesService.findByInstructor(req.user.id, query);
+  }
+
+  @Delete(':id')
+  async softDeleteCourse(@Req() req, @Param('id') id: number) {
+    await this.coursesService.softDeleteCourse(req.user.id, id);
+    return { success: true, message: 'Khóa học đã được đưa vào lưu trữ' };
   }
 
   @Post()

@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  console.log('🔄 Đang khởi động lại Backend để nạp cấu hình mới...');
+  console.log('Đang khởi động lại Backend để nạp cấu hình mới...');
   const app = await NestFactory.create(AppModule, {
     rawBody: true, // cần cho Clerk webhook signature verification
   });

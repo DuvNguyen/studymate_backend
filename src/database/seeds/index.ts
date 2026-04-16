@@ -15,13 +15,21 @@ import { Course } from '../entities/course.entity';
 import { Section } from '../entities/section.entity';
 import { Lesson } from '../entities/lesson.entity';
 import { Video } from '../entities/video.entity';
+import { QuestionBank } from '../entities/question-bank.entity';
+import { QuestionBankQuestion } from '../entities/question-bank-question.entity';
+import { QuestionBankOption } from '../entities/question-bank-option.entity';
+import { Exam } from '../entities/exam.entity';
+import { ExamSectionConfig } from '../entities/exam-section-config.entity';
+import { seedSectionsAndLessons } from './05-sections-lessons.seed';
+import { seedQuestionBanks } from './09-question-banks.seed';
+import { seedBulkCourses } from './10-bulk-courses.seed';
 
 // Khởi tạo kết nối DB trực tiếp — không qua NestJS
 const dataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  entities: [User, Role, Category, Profile, InstructorProfile, InstructorDocument, StaffProfile, Course, Section, Lesson, Video],
+  entities: [User, Role, Category, Profile, InstructorProfile, InstructorDocument, StaffProfile, Course, Section, Lesson, Video, QuestionBank, QuestionBankQuestion, QuestionBankOption, Exam, ExamSectionConfig],
   synchronize: true, // tự tạo bảng nếu chưa có (chỉ dùng khi seed)
 });
 
@@ -43,6 +51,15 @@ async function runSeeds() {
 
   console.log('\n4. Khởi tạo khóa học mẫu...');
   await seedSampleCourse(dataSource);
+
+  console.log('\n4.5 Khởi tạo Sections & Lessons...');
+  await seedSectionsAndLessons(dataSource);
+
+  console.log('\n5. Khởi tạo ngân hàng câu hỏi & bài thi mẫu...');
+  await seedQuestionBanks(dataSource);
+
+  console.log('\n6. Khởi tạo hàng loạt khóa học mẫu...');
+  await seedBulkCourses(dataSource);
 
   await dataSource.destroy();
 

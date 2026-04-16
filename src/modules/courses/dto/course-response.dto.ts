@@ -123,6 +123,9 @@ export class CourseResponseDto {
   @Expose()
   @Type(() => SectionDto)
   sections: SectionDto[];
+
+  @Expose()
+  previewVideo: any;
 }
 
 export class PaginationMetaDto {

@@ -13,4 +13,12 @@ export class CreateCourseDto {
   @IsOptional()
   @IsEnum(CourseLevel, { message: 'Cấp độ không hợp lệ' })
   level?: CourseLevel;
+
+  @IsNotEmpty({ message: 'Giá không được để trống' })
+  @IsNumber({}, { message: 'Giá phải là số' })
+  price: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'Giá gốc phải là số' })
+  originalPrice?: number;
 }

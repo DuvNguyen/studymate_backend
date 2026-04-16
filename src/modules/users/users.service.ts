@@ -201,14 +201,18 @@ export class UsersService {
 
   // ─── Admin – list & detail ──────────────────────────────────────────────────
 
-  async getPendingKyc() {
+  async getKycRequests(status?: KycStatus | string) {
     const qb = this.userRepo
       .createQueryBuilder('user')
       .innerJoinAndSelect('user.instructorProfile', 'instructorProfile')
       .leftJoinAndSelect('user.instructorDocuments', 'instructorDocuments')
-      .leftJoinAndSelect('user.profile', 'profile')
-      .where('instructorProfile.kyc_status = :status', { status: KycStatus.PENDING })
-      .orderBy('user.createdAt', 'DESC');
+      .leftJoinAndSelect('user.profile', 'profile');
+
+    if (status && status !== 'ALL') {
+      qb.where('instructorProfile.kyc_status = :status', { status });
+    }
+    
+    qb.orderBy('user.createdAt', 'DESC');
     
     const users = await qb.getMany();
     return users.map(u => {
