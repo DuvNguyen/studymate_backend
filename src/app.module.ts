@@ -18,10 +18,14 @@ import { SectionsModule } from './modules/sections/sections.module';
 import { LessonsModule } from './modules/lessons/lessons.module';
 import { User } from './database/entities/user.entity';
 import { Role } from './database/entities/role.entity';
+import { CartsModule } from './modules/carts/carts.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+
 
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -47,6 +51,9 @@ import { Role } from './database/entities/role.entity';
     VideosModule,
     SectionsModule,
     LessonsModule,
+    CartsModule,
+    OrdersModule,
+    EnrollmentsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

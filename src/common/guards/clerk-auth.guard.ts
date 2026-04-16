@@ -37,7 +37,10 @@ export class ClerkAuthGuard implements CanActivate {
       (request as any).clerkUserId = payload.sub;
       return true;
     } catch (err: any) {
-      console.error('[ClerkAuthGuard] verifyToken failed:', err?.message || err);
+      console.error('[ClerkAuthGuard] verifyToken FAILED!');
+      console.error('[ClerkAuthGuard] Error Name:', err?.name);
+      console.error('[ClerkAuthGuard] Error Message:', err?.message);
+      console.error('[ClerkAuthGuard] Token prefix:', token ? token.substring(0, 10) + '...' : 'NONE');
       throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
     }
   }
