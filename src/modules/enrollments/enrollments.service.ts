@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Enrollment } from '../../database/entities/enrollment.entity';
@@ -40,5 +40,35 @@ export class EnrollmentsService {
       console.error(`[EnrollmentsService] Error fetching courses:`, error);
       throw error;
     }
+  }
+
+  async directEnroll(courseId: number, user: User): Promise<EnrollmentResponseDto> {
+    const course = await this.enrollmentsRepo.manager.findOne('Course', { where: { id: courseId } }) as any;
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+
+    // Check existing
+    const existing = await this.enrollmentsRepo.findOne({
+      where: { student_id: user.id, course_id: courseId, is_active: true }
+    });
+    if (existing) throw new BadRequestException('Người dùng đã được ghi danh vào khóa học này');
+
+    const enrollment = this.enrollmentsRepo.create({
+      student_id: user.id,
+      course_id: courseId,
+      is_active: true,
+      enrolled_at: new Date(),
+    });
+
+    const saved = await this.enrollmentsRepo.save(enrollment);
+    
+    // Map response
+    const data = {
+      ...saved,
+      course: {
+        ...course,
+        instructor_name: 'Instructor', // For simplicity in direct enroll
+      }
+    };
+    return plainToInstance(EnrollmentResponseDto, data, { excludeExtraneousValues: true });
   }
 }
