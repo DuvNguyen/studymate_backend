@@ -22,8 +22,9 @@ export class EnrollmentsController {
   async directEnroll(
     @CurrentUser() user: User,
     @Body('courseId') courseId: number,
+    @Body('studentId') studentId?: number,
   ): Promise<EnrollmentResponseDto> {
     if (!courseId) throw new BadRequestException('Thiếu courseId');
-    return this.enrollmentsService.directEnroll(courseId, user);
+    return this.enrollmentsService.directEnroll(courseId, user, studentId);
   }
 }

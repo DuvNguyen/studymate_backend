@@ -137,7 +137,6 @@ export class UsersController {
     return { data: user, message: 'Lấy thông tin người dùng thành công' };
   }
 
-  // ─── Admin – mutations ──────────────────────────────────────────────────────
 
   /** PATCH /api/v1/users/:id/status */
   @Roles('ADMIN')

@@ -21,6 +21,7 @@ import { Role } from './database/entities/role.entity';
 import { CartsModule } from './modules/carts/carts.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
     CartsModule,
     OrdersModule,
     EnrollmentsModule,
+    WishlistModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

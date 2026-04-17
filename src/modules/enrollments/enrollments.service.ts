@@ -42,33 +42,46 @@ export class EnrollmentsService {
     }
   }
 
-  async directEnroll(courseId: number, user: User): Promise<EnrollmentResponseDto> {
-    const course = await this.enrollmentsRepo.manager.findOne('Course', { where: { id: courseId } }) as any;
+  async directEnroll(
+    courseId: number,
+    enroller: User,
+    targetStudentId?: number,
+  ): Promise<EnrollmentResponseDto> {
+    const course = (await this.enrollmentsRepo.manager.findOne('Course', {
+      where: { id: courseId },
+      relations: ['instructor', 'instructor.profile'],
+    })) as any;
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+
+    const studentId = targetStudentId || enroller.id;
 
     // Check existing
     const existing = await this.enrollmentsRepo.findOne({
-      where: { student_id: user.id, course_id: courseId, is_active: true }
+      where: { student_id: studentId, course_id: courseId, is_active: true },
     });
-    if (existing) throw new BadRequestException('Người dùng đã được ghi danh vào khóa học này');
+    if (existing)
+      throw new BadRequestException('Người dùng đã được ghi danh vào khóa học này');
 
     const enrollment = this.enrollmentsRepo.create({
-      student_id: user.id,
+      student_id: studentId,
       course_id: courseId,
+      enroller_id: enroller.id,
       is_active: true,
       enrolled_at: new Date(),
     });
 
     const saved = await this.enrollmentsRepo.save(enrollment);
-    
+
     // Map response
     const data = {
       ...saved,
       course: {
         ...course,
-        instructor_name: 'Instructor', // For simplicity in direct enroll
-      }
+        instructor_name: course.instructor?.profile?.fullName || 'Instructor',
+      },
     };
-    return plainToInstance(EnrollmentResponseDto, data, { excludeExtraneousValues: true });
+    return plainToInstance(EnrollmentResponseDto, data, {
+      excludeExtraneousValues: true,
+    });
   }
 }
