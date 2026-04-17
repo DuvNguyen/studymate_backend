@@ -69,13 +69,13 @@ export class CartsService {
       where: { student_id: user.id, course_id: course.id, is_active: true }
     });
     if (enrollment) {
-      throw new BadRequestException('You already own this course');
+      throw new BadRequestException('Bạn đã sở hữu khóa học này');
     }
 
     // 4. Check duplicate in cart
     const existingItem = cart.cart_items.find(item => item.course_id === course.id);
     if (existingItem) {
-      throw new BadRequestException('Course is already in your cart');
+      throw new BadRequestException('Khóa học này đã có trong giỏ hàng');
     }
 
     // 5. Add item

@@ -110,7 +110,7 @@ export class CoursesService {
    */
   async findPublicCourses(query: CourseQueryDto): Promise<PaginatedCoursesDto> {
     const page = query.page ?? 1;
-    const limit = query.limit ?? 12;
+    const limit = query.limit ?? 9;
     const skip = (page - 1) * limit;
 
     const qb = this.coursesRepository
@@ -156,10 +156,20 @@ export class CoursesService {
       qb.andWhere('course.level = :level', { level: query.level });
     }
 
-    qb.orderBy('course.publishedAt', 'DESC')
-      .addOrderBy('course.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit);
+    // Dynamic Sorting
+    const sortBy = query.sortBy || 'publishedAt';
+    const sortOrder = query.sortOrder || 'DESC';
+
+    if (sortBy === 'publishedAt') {
+      qb.orderBy('course.publishedAt', sortOrder)
+        .addOrderBy('course.createdAt', sortOrder);
+    } else {
+      qb.orderBy(`course.${sortBy}`, sortOrder);
+      // Secondary sort for stability
+      qb.addOrderBy('course.publishedAt', 'DESC');
+    }
+
+    qb.skip(skip).take(limit);
 
     const [courses, total] = await qb.getManyAndCount();
 
@@ -325,7 +335,7 @@ export class CoursesService {
 
   async findAllForAdmin(query?: CourseQueryDto): Promise<PaginatedCoursesDto> {
     const page = query?.page ?? 1;
-    const limit = query?.limit ?? 10;
+    const limit = query?.limit ?? 5;
     const skip = (page - 1) * limit;
 
     const qb = this.coursesRepository

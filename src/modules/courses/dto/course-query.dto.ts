@@ -36,4 +36,12 @@ export class CourseQueryDto {
   @Min(1)
   @Max(50)
   limit?: number = 12;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: 'publishedAt' | 'avgRating' | 'studentCount';
+
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'ASC' | 'DESC' = 'DESC';
 }

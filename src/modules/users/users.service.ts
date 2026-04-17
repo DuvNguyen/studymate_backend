@@ -17,11 +17,16 @@ import { UpdateStaffProfileDto } from './dto/update-staff-profile.dto';
 import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
 import { createClerkClient } from '@clerk/backend';
 
-export interface PaginatedUsers {
-  data: any[];
+export interface PaginationMeta {
   total: number;
   page: number;
   limit: number;
+  totalPages: number;
+}
+
+export interface PaginatedUsers {
+  data: any[];
+  meta: PaginationMeta;
 }
 
 @Injectable()
@@ -276,7 +281,7 @@ export class UsersService {
     status?: string;
     search?: string;
   }): Promise<PaginatedUsers> {
-    const { page, limit, role, status, search } = opts;
+    const { page, limit = 10, role, status, search } = opts;
     const skip = (page - 1) * limit;
 
     const qb = this.userRepo
@@ -305,9 +310,12 @@ export class UsersService {
 
     return {
       data: users.map((u) => this.toPublicProfile(u)),
-      total,
-      page,
-      limit,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 

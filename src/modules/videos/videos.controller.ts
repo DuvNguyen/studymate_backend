@@ -20,6 +20,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { VideoResponseDto } from './dto/video-response.dto';
 import { VideoStatus } from '../../database/entities/video.entity';
+import { VideoQueryDto } from './dto/video-query.dto';
+import { PaginatedVideosDto } from './dto/paginated-videos.dto';
 
 /** Tối đa 500MB per upload */
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
@@ -79,17 +81,13 @@ export class VideosController {
     return this.videosService.uploadToYoutube(file, user.id, title);
   }
 
-  /**
-   * GET /api/v1/videos/instructor
-   * Giảng viên lấy danh sách video do mình upload
-   */
   @Get('instructor')
   @Roles('INSTRUCTOR', 'ADMIN')
   async getInstructorVideos(
     @CurrentUser() user: User,
-    @Query('status') status?: VideoStatus,
-  ): Promise<VideoResponseDto[]> {
-    return this.videosService.getInstructorVideos(user.id, status);
+    @Query() query: VideoQueryDto,
+  ): Promise<PaginatedVideosDto> {
+    return this.videosService.getInstructorVideos(user.id, query);
   }
 
   /**
@@ -98,8 +96,10 @@ export class VideosController {
    */
   @Get('pending')
   @Roles('STAFF', 'ADMIN')
-  async getPendingVideos(): Promise<VideoResponseDto[]> {
-    return this.videosService.getPendingVideos();
+  async getPendingVideos(
+    @Query() query: VideoQueryDto,
+  ): Promise<PaginatedVideosDto> {
+    return this.videosService.getPendingVideos(query);
   }
 
   /**

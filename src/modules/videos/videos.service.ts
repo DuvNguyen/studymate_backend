@@ -14,6 +14,8 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Video, VideoStatus } from '../../database/entities/video.entity';
 import { VideoResponseDto } from './dto/video-response.dto';
 import { YoutubeUtils } from './utils/youtube-utils';
+import { VideoQueryDto } from './dto/video-query.dto';
+import { PaginatedVideosDto, PaginationMetaDto } from './dto/paginated-videos.dto';
 
 @Injectable()
 export class VideosService {
@@ -125,29 +127,76 @@ export class VideosService {
 
   // ─── Controller Methods ────────────────────────────────────────────────────
 
-  async getInstructorVideos(instructorId: number, status?: VideoStatus): Promise<VideoResponseDto[]> {
+  async getInstructorVideos(instructorId: number, query: VideoQueryDto): Promise<PaginatedVideosDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 5;
+    const skip = (page - 1) * limit;
+
     const whereCondition: any = { uploaderId: instructorId };
-    if (status) {
-      whereCondition.status = status;
+    if (query.status) {
+      whereCondition.status = query.status;
     }
-    const videos = await this.videosRepository.find({
+
+    const [videos, total] = await this.videosRepository.findAndCount({
       where: whereCondition,
       order: { uploadedAt: 'DESC' },
+      skip,
+      take: limit,
     });
-    return videos.map((v) => this.toDto(v));
+
+    return {
+      data: videos.map((v) => this.toDto(v)),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
-  async getPendingVideos(): Promise<VideoResponseDto[]> {
-    const videos = await this.videosRepository.find({
-      where: { status: VideoStatus.PENDING_REVIEW },
-      relations: ['uploader'],
-      order: { uploadedAt: 'ASC' },
-    });
-    return videos.map((v) => {
-      const dto = this.toDto(v);
-      // Gắn thêm email người upload nếu cần
-      return dto;
-    });
+  async getPendingVideos(query: VideoQueryDto): Promise<PaginatedVideosDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 5;
+    const skip = (page - 1) * limit;
+
+    const qb = this.videosRepository
+      .createQueryBuilder('video')
+      .leftJoinAndSelect('video.uploader', 'uploader')
+      .leftJoinAndSelect('uploader.profile', 'profile')
+      .where('video.status = :status', { status: VideoStatus.PENDING_REVIEW });
+
+    if (query.uploaderId) {
+      qb.andWhere('video.uploaderId = :uploaderId', { uploaderId: query.uploaderId });
+    }
+
+    if (query.id) {
+      qb.andWhere('video.id = :id', { id: query.id });
+    }
+
+    if (query.status && query.status !== 'ALL') {
+       qb.andWhere('video.status = :customStatus', { customStatus: query.status });
+    }
+
+    qb.orderBy('video.uploadedAt', 'ASC')
+      .skip(skip)
+      .take(limit);
+
+    const [videos, total] = await qb.getManyAndCount();
+
+    return {
+      data: videos.map((v) => {
+        const dto = this.toDto(v);
+        // Can add more info if needed
+        return dto;
+      }),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async reviewVideo(
