@@ -14,7 +14,10 @@ import type { Request } from 'express';
 import { User } from '../database/entities/user.entity';
 import { Role } from '../database/entities/role.entity';
 import { Profile } from '../database/entities/profile.entity';
-import { InstructorProfile, KycStatus } from '../database/entities/instructor-profile.entity';
+import {
+  InstructorProfile,
+  KycStatus,
+} from '../database/entities/instructor-profile.entity';
 
 @Controller('webhooks')
 export class ClerkWebhookController {
@@ -44,7 +47,9 @@ export class ClerkWebhookController {
     const webhookSecret = this.config.get<string>('CLERK_WEBHOOK_SECRET');
 
     if (!webhookSecret) {
-      throw new InternalServerErrorException('Thiếu cấu hình CLERK_WEBHOOK_SECRET');
+      throw new InternalServerErrorException(
+        'Thiếu cấu hình CLERK_WEBHOOK_SECRET',
+      );
     }
 
     // Xác minh chữ ký webhook từ Clerk
@@ -78,7 +83,8 @@ export class ClerkWebhookController {
 
       // Đọc Role từ Metadata truyền sang (nếu không có, cho là STUDENT)
       const roleFromMetadata = payload.data.public_metadata?.role;
-      const roleNameToFind = roleFromMetadata === 'INSTRUCTOR' ? 'INSTRUCTOR' : 'STUDENT';
+      const roleNameToFind =
+        roleFromMetadata === 'INSTRUCTOR' ? 'INSTRUCTOR' : 'STUDENT';
 
       // Lấy role từ DB
       const dbRole = await this.roleRepo.findOne({
@@ -117,7 +123,9 @@ export class ClerkWebhookController {
         });
       }
 
-      console.log(`✅ Tạo user & role:[${roleNameToFind}] mới từ Clerk: ${email}`);
+      console.log(
+        `✅ Tạo user & role:[${roleNameToFind}] mới từ Clerk: ${email}`,
+      );
     }
 
     // Xử lý sự kiện user.updated (sync email, avatar)

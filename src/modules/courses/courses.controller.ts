@@ -1,7 +1,14 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../database/entities/user.entity';
 import { CoursesService } from './courses.service';
 import { CourseQueryDto } from './dto/course-query.dto';
-import { CourseResponseDto, PaginatedCoursesDto } from './dto/course-response.dto';
+import {
+  CourseResponseDto,
+  PaginatedCoursesDto,
+} from './dto/course-response.dto';
 
 @Controller('courses')
 export class CoursesController {
@@ -24,5 +31,18 @@ export class CoursesController {
   @Get(':slug')
   async findOne(@Param('slug') slug: string): Promise<CourseResponseDto> {
     return this.coursesService.findBySlug(slug);
+  }
+
+  /**
+   * GET /api/v1/courses/:slug/learn
+   * Lấy chi tiết học tập (kèm tất cả video) — yêu cầu đăng ký.
+   */
+  @Get(':slug/learn')
+  @UseGuards(ClerkAuthGuard, RolesGuard)
+  async findOneForLearn(
+    @CurrentUser() user: User,
+    @Param('slug') slug: string,
+  ): Promise<CourseResponseDto> {
+    return this.coursesService.findCourseForLearn(user.id, slug);
   }
 }

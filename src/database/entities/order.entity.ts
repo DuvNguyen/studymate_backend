@@ -39,7 +39,12 @@ export class Order {
   @Column('decimal', { precision: 10, scale: 2, name: 'subtotal' })
   subtotal: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0, name: 'discount_amount' })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'discount_amount',
+  })
   discount_amount: number;
 
   @Column('decimal', { precision: 10, scale: 2, name: 'total_amount' })

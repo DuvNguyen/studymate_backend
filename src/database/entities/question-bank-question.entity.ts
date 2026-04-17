@@ -34,7 +34,10 @@ export class QuestionBankQuestion {
   @Column({ name: 'bank_id' })
   bankId: number;
 
-  @ManyToOne(() => QuestionBank, (bank) => bank.questions, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => QuestionBank, (bank) => bank.questions, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'bank_id' })
   bank: QuestionBank;
 
@@ -64,7 +67,9 @@ export class QuestionBankQuestion {
   @JoinColumn({ name: 'added_by' })
   addedBy: User | null;
 
-  @OneToMany(() => QuestionBankOption, (option) => option.question, { cascade: true })
+  @OneToMany(() => QuestionBankOption, (option) => option.question, {
+    cascade: true,
+  })
   options: QuestionBankOption[];
 
   @CreateDateColumn({ name: 'added_at' })

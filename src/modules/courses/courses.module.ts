@@ -12,8 +12,14 @@ import { AdminCoursesController } from './admin-courses.controller';
 import { CoursesService } from './courses.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Course, Category, Video, Section, Lesson, User])],
-  controllers: [CoursesController, InstructorCoursesController, AdminCoursesController],
+  imports: [
+    TypeOrmModule.forFeature([Course, Category, Video, Section, Lesson, User]),
+  ],
+  controllers: [
+    CoursesController,
+    InstructorCoursesController,
+    AdminCoursesController,
+  ],
   providers: [CoursesService],
   exports: [CoursesService],
 })

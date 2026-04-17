@@ -58,7 +58,9 @@ export class Exam {
   @JoinColumn({ name: 'created_by' })
   createdBy: User | null;
 
-  @OneToMany(() => ExamSectionConfig, (config) => config.exam, { cascade: true })
+  @OneToMany(() => ExamSectionConfig, (config) => config.exam, {
+    cascade: true,
+  })
   sectionConfigs: ExamSectionConfig[];
 
   @CreateDateColumn({ name: 'created_at' })

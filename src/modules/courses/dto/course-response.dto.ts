@@ -1,4 +1,4 @@
-import { Expose, Type } from 'class-transformer';
+import { Expose, Type, Transform } from 'class-transformer';
 
 export class LessonDto {
   @Expose()
@@ -18,6 +18,9 @@ export class LessonDto {
 
   @Expose()
   position: number;
+
+  @Expose()
+  content: string | null;
 }
 
 export class SectionDto {
@@ -73,9 +76,11 @@ export class CourseResponseDto {
   @Expose()
   thumbnailUrl: string | null;
 
+  @Transform(({ value }) => Number(value))
   @Expose()
   price: number;
 
+  @Transform(({ value }) => (value !== null ? Number(value) : null))
   @Expose()
   originalPrice: number | null;
 
@@ -100,6 +105,7 @@ export class CourseResponseDto {
   @Expose()
   studentCount: number;
 
+  @Transform(({ value }) => Number(value))
   @Expose()
   avgRating: number;
 

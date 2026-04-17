@@ -13,11 +13,17 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
-import { ClerkUserId, CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  ClerkUserId,
+  CurrentUser,
+} from '../../common/decorators/current-user.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
 import { UpdateStaffProfileDto } from './dto/update-staff-profile.dto';
-import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
+import {
+  UpdateUserStatusDto,
+  UpdateUserRoleDto,
+} from './dto/update-user-admin.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { User } from '../../database/entities/user.entity';
@@ -61,7 +67,10 @@ export class UsersController {
     @ClerkUserId() clerkUserId: string,
     @Body() dto: UpdateKycDto,
   ) {
-    const kycData = await this.usersService.updateInstructorKyc(clerkUserId, dto);
+    const kycData = await this.usersService.updateInstructorKyc(
+      clerkUserId,
+      dto,
+    );
     return { data: kycData, message: 'Cập nhật KYC thành công' };
   }
 
@@ -80,8 +89,14 @@ export class UsersController {
     @ClerkUserId() clerkUserId: string,
     @Body() dto: UpdateStaffProfileDto,
   ) {
-    const profile = await this.usersService.updateStaffProfile(clerkUserId, dto);
-    return { data: profile, message: 'Cập nhật thông tin nhân viên thành công' };
+    const profile = await this.usersService.updateStaffProfile(
+      clerkUserId,
+      dto,
+    );
+    return {
+      data: profile,
+      message: 'Cập nhật thông tin nhân viên thành công',
+    };
   }
 
   // ─── Admin – danh sách & chi tiết ──────────────────────────────────────────
@@ -137,8 +152,6 @@ export class UsersController {
     return { data: user, message: 'Lấy thông tin người dùng thành công' };
   }
 
-  // ─── Admin – mutations ──────────────────────────────────────────────────────
-
   /** PATCH /api/v1/users/:id/status */
   @Roles('ADMIN')
   @Patch(':id/status')
@@ -166,7 +179,10 @@ export class UsersController {
   /** DELETE /api/v1/users/:id */
   @Roles('ADMIN')
   @Delete(':id')
-  async deleteUser(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestor: User) {
+  async deleteUser(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() requestor: User,
+  ) {
     const result = await this.usersService.deleteUser(id, requestor);
     return { data: result, message: 'Xóa hệ thống và Clerk thành công' };
   }

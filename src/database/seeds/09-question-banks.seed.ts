@@ -1,7 +1,11 @@
 import { DataSource } from 'typeorm';
 import { Course } from '../entities/course.entity';
 import { QuestionBank } from '../entities/question-bank.entity';
-import { QuestionBankQuestion, QuestionType, QuestionDifficulty } from '../entities/question-bank-question.entity';
+import {
+  QuestionBankQuestion,
+  QuestionType,
+  QuestionDifficulty,
+} from '../entities/question-bank-question.entity';
 import { QuestionBankOption } from '../entities/question-bank-option.entity';
 import { Exam } from '../entities/exam.entity';
 
@@ -32,7 +36,8 @@ export async function seedQuestionBanks(dataSource: DataSource) {
   const bank = qbRepo.create({
     courseId: 1,
     title: 'Ngân hàng đề thi Web Cơ Bản',
-    description: 'Tập hợp các câu hỏi trắc nghiệm Web và React cho khóa học mẫu',
+    description:
+      'Tập hợp các câu hỏi trắc nghiệm Web và React cho khóa học mẫu',
   });
   const savedBank = await qbRepo.save(bank);
 
@@ -48,16 +53,37 @@ export async function seedQuestionBanks(dataSource: DataSource) {
   const savedQ1 = await questionRepo.save(q1);
 
   await optionRepo.save([
-    { questionId: savedQ1.id, optionText: 'font-color', isCorrect: false, sortOrder: 1 },
-    { questionId: savedQ1.id, optionText: 'text-color', isCorrect: false, sortOrder: 2 },
-    { questionId: savedQ1.id, optionText: 'color', isCorrect: true, sortOrder: 3 },
-    { questionId: savedQ1.id, optionText: 'fgcolor', isCorrect: false, sortOrder: 4 },
+    {
+      questionId: savedQ1.id,
+      optionText: 'font-color',
+      isCorrect: false,
+      sortOrder: 1,
+    },
+    {
+      questionId: savedQ1.id,
+      optionText: 'text-color',
+      isCorrect: false,
+      sortOrder: 2,
+    },
+    {
+      questionId: savedQ1.id,
+      optionText: 'color',
+      isCorrect: true,
+      sortOrder: 3,
+    },
+    {
+      questionId: savedQ1.id,
+      optionText: 'fgcolor',
+      isCorrect: false,
+      sortOrder: 4,
+    },
   ]);
 
   // 2. Tạo câu hỏi 2
   const q2 = questionRepo.create({
     bankId: savedBank.id,
-    questionText: 'React hook nào được dùng để quản lý state trong functional component?',
+    questionText:
+      'React hook nào được dùng để quản lý state trong functional component?',
     questionType: QuestionType.MCQ,
     difficulty: QuestionDifficulty.MEDIUM,
     isActive: true,
@@ -66,10 +92,30 @@ export async function seedQuestionBanks(dataSource: DataSource) {
   const savedQ2 = await questionRepo.save(q2);
 
   await optionRepo.save([
-    { questionId: savedQ2.id, optionText: 'useEffect', isCorrect: false, sortOrder: 1 },
-    { questionId: savedQ2.id, optionText: 'useState', isCorrect: true, sortOrder: 2 },
-    { questionId: savedQ2.id, optionText: 'useContext', isCorrect: false, sortOrder: 3 },
-    { questionId: savedQ2.id, optionText: 'useReducer', isCorrect: false, sortOrder: 4 },
+    {
+      questionId: savedQ2.id,
+      optionText: 'useEffect',
+      isCorrect: false,
+      sortOrder: 1,
+    },
+    {
+      questionId: savedQ2.id,
+      optionText: 'useState',
+      isCorrect: true,
+      sortOrder: 2,
+    },
+    {
+      questionId: savedQ2.id,
+      optionText: 'useContext',
+      isCorrect: false,
+      sortOrder: 3,
+    },
+    {
+      questionId: savedQ2.id,
+      optionText: 'useReducer',
+      isCorrect: false,
+      sortOrder: 4,
+    },
   ]);
 
   // 3. Tạo một đề thi mẫu (Blueprint)

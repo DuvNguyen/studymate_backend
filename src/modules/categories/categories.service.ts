@@ -27,7 +27,9 @@ export class CategoriesService {
     dto.children = includeChildren
       ? (cat.children ?? [])
           .filter((c) => c.isActive)
-          .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+          .sort(
+            (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+          )
           .map((c) => this.toDto(c, false)) // false — không load tiếp children của children
       : [];
     return dto;

@@ -47,7 +47,9 @@ export class Course {
   @Column({ name: 'category_id' })
   categoryId: number;
 
-  @ManyToOne(() => Category, (category) => category.courses, { nullable: false })
+  @ManyToOne(() => Category, (category) => category.courses, {
+    nullable: false,
+  })
   @JoinColumn({ name: 'category_id' })
   category: Category;
 
@@ -81,7 +83,13 @@ export class Course {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'original_price', nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    name: 'original_price',
+    nullable: true,
+  })
   originalPrice: number | null;
 
   // ── Phân loại ─────────────────────────────────────────────────
@@ -115,7 +123,13 @@ export class Course {
   @Column({ type: 'int', name: 'student_count', default: 0 })
   studentCount: number;
 
-  @Column({ type: 'decimal', precision: 3, scale: 2, name: 'avg_rating', default: 0 })
+  @Column({
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    name: 'avg_rating',
+    default: 0,
+  })
   avgRating: number;
 
   @Column({ type: 'int', name: 'review_count', default: 0 })

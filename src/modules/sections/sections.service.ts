@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Section } from '../../database/entities/section.entity';
@@ -13,9 +17,16 @@ export class SectionsService {
     private readonly coursesRepository: Repository<Course>,
   ) {}
 
-  async createSection(instructorId: number, courseId: number, dto: { title: string; position?: number }) {
-    const course = await this.coursesRepository.findOne({ where: { id: courseId, instructorId } });
-    if (!course) throw new NotFoundException('Course not found or unauthorized');
+  async createSection(
+    instructorId: number,
+    courseId: number,
+    dto: { title: string; position?: number },
+  ) {
+    const course = await this.coursesRepository.findOne({
+      where: { id: courseId, instructorId },
+    });
+    if (!course)
+      throw new NotFoundException('Course not found or unauthorized');
 
     let position = dto.position;
     if (position === undefined) {
@@ -34,7 +45,11 @@ export class SectionsService {
     return this.sectionsRepository.save(section);
   }
 
-  async updateSection(instructorId: number, id: number, dto: { title?: string; position?: number }) {
+  async updateSection(
+    instructorId: number,
+    id: number,
+    dto: { title?: string; position?: number },
+  ) {
     const section = await this.sectionsRepository.findOne({
       where: { id },
       relations: ['course'],

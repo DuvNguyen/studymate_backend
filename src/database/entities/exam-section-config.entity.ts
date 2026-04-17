@@ -19,7 +19,10 @@ export class ExamSectionConfig {
   @Column({ name: 'exam_id' })
   examId: number;
 
-  @ManyToOne(() => Exam, (exam) => exam.sectionConfigs, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Exam, (exam) => exam.sectionConfigs, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'exam_id' })
   exam: Exam;
 

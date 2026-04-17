@@ -20,7 +20,9 @@ export class Lesson {
   @Column({ name: 'section_id' })
   sectionId: number;
 
-  @ManyToOne(() => Section, (section) => section.lessons, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Section, (section) => section.lessons, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'section_id' })
   section: Section;
 

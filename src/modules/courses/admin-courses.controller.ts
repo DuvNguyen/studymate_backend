@@ -1,11 +1,17 @@
-import { Controller, Get, Param, Put, Query, UseGuards, Req, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Put,
+  Query,
+  UseGuards,
+  Body,
+} from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CourseStatus } from '../../database/entities/course.entity';
 import { RejectCourseDto } from './dto/course-approval.dto';
-
 import { CourseQueryDto } from './dto/course-query.dto';
 
 @Controller('admin/courses')
@@ -20,17 +26,17 @@ export class AdminCoursesController {
   }
 
   @Put(':id/suspend')
-  async suspendCourse(@Req() req, @Param('id') id: string, @Body() dto: RejectCourseDto) {
-    return this.coursesService.suspendCourse(parseInt(id, 10), req.user.id, dto);
+  async suspendCourse(@Param('id') id: string, @Body() dto: RejectCourseDto) {
+    return this.coursesService.suspendCourse(parseInt(id, 10), dto);
   }
 
   @Put(':id/approve')
-  async approveCourse(@Req() req, @Param('id') id: string) {
-    return this.coursesService.approveCourse(parseInt(id, 10), req.user.id);
+  async approveCourse(@Param('id') id: string) {
+    return this.coursesService.approveCourse(parseInt(id, 10));
   }
 
   @Put(':id/reject')
-  async rejectCourse(@Req() req, @Param('id') id: string, @Body() dto: RejectCourseDto) {
-    return this.coursesService.rejectCourse(parseInt(id, 10), req.user.id, dto);
+  async rejectCourse(@Param('id') id: string, @Body() dto: RejectCourseDto) {
+    return this.coursesService.rejectCourse(parseInt(id, 10), dto);
   }
 }

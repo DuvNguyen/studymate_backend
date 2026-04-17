@@ -12,6 +12,9 @@ export class CourseShortResponseDto {
 
   @Expose()
   instructor_name: string;
+
+  @Expose()
+  slug: string;
 }
 
 export class EnrollmentResponseDto {

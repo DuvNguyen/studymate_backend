@@ -29,7 +29,9 @@ export class Category {
   @Column({ type: 'int', name: 'parent_id', nullable: true })
   parentId: number | null;
 
-  @ManyToOne(() => Category, (category) => category.children, { nullable: true })
+  @ManyToOne(() => Category, (category) => category.children, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'parent_id' })
   parent: Category | null;
 

@@ -8,8 +8,12 @@ export async function seedUsers(dataSource: DataSource) {
 
   const roleAdmin = await roleRepo.findOne({ where: { roleName: 'ADMIN' } });
   const roleStaff = await roleRepo.findOne({ where: { roleName: 'STAFF' } });
-  const roleInstructor = await roleRepo.findOne({ where: { roleName: 'INSTRUCTOR' } });
-  const roleStudent = await roleRepo.findOne({ where: { roleName: 'STUDENT' } });
+  const roleInstructor = await roleRepo.findOne({
+    where: { roleName: 'INSTRUCTOR' },
+  });
+  const roleStudent = await roleRepo.findOne({
+    where: { roleName: 'STUDENT' },
+  });
 
   if (!roleAdmin || !roleStaff || !roleInstructor || !roleStudent) {
     throw new Error('Roles chưa được tạo. Hãy chạy seedRoles trước.');
@@ -49,7 +53,9 @@ export async function seedUsers(dataSource: DataSource) {
   ];
 
   for (const data of seedData) {
-    const existing = await userRepo.findOne({ where: { clerkUserId: data.clerkUserId } });
+    const existing = await userRepo.findOne({
+      where: { clerkUserId: data.clerkUserId },
+    });
     if (!existing) {
       await userRepo.save(data);
       console.log(`  Tạo user: ${data.email}`);

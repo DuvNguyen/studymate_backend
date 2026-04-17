@@ -22,18 +22,25 @@ export class Enrollment {
   @Column({ name: 'course_id' })
   course_id: number;
 
-  @Column({ name: 'order_item_id' })
+  @Column({ name: 'order_item_id', nullable: true })
   order_item_id: number;
+
+  @Column({ name: 'enroller_id', nullable: true })
+  enroller_id: number;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'student_id' })
   student: User;
 
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'enroller_id' })
+  enroller: User;
+
   @ManyToOne(() => Course)
   @JoinColumn({ name: 'course_id' })
   course: Course;
 
-  @OneToOne(() => OrderItem)
+  @OneToOne(() => OrderItem, { nullable: true })
   @JoinColumn({ name: 'order_item_id' })
   order_item: OrderItem;
 
@@ -56,5 +63,5 @@ export class Enrollment {
   last_accessed_at: Date;
 
   @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
-  completed_at: Date;
+  completed_at: Date | null;
 }

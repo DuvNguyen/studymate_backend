@@ -21,11 +21,13 @@ import { Role } from './database/entities/role.entity';
 import { CartsModule } from './modules/carts/carts.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
+import { DiscussionsModule } from './modules/discussions/discussions.module';
+import { LessonProgressModule } from './modules/lesson-progress/lesson-progress.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-
 
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -54,6 +56,9 @@ import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
     CartsModule,
     OrdersModule,
     EnrollmentsModule,
+    WishlistModule,
+    DiscussionsModule,
+    LessonProgressModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

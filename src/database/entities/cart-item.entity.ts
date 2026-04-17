@@ -34,7 +34,12 @@ export class CartItem {
   @Column('decimal', { precision: 10, scale: 2, name: 'original_price' })
   original_price: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0, name: 'discount_amount' })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'discount_amount',
+  })
   discount_amount: number;
 
   @Column('decimal', { precision: 10, scale: 2, name: 'final_price' })

@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { Role } from '../../database/entities/role.entity';
-import { InstructorProfile, KycStatus } from '../../database/entities/instructor-profile.entity';
+import {
+  InstructorProfile,
+  KycStatus,
+} from '../../database/entities/instructor-profile.entity';
 import { createClerkClient } from '@clerk/backend';
 
 @Injectable()
@@ -69,15 +72,21 @@ export class AuthService {
     });
 
     if (!roleRecord) {
-      throw new Error(`Khoá định danh Role ${requestRole} không tồn tại trong DB.`);
+      throw new Error(
+        `Khoá định danh Role ${requestRole} không tồn tại trong DB.`,
+      );
     }
 
-    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+    const clerk = createClerkClient({
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
     let clerkUser: any;
     try {
       clerkUser = await clerk.users.getUser(clerkUserId);
     } catch (error: any) {
-      throw new UnauthorizedException('Không thể xác thực info từ Clerk: ' + error.message);
+      throw new UnauthorizedException(
+        'Không thể xác thực info từ Clerk: ' + error.message,
+      );
     }
 
     const email = clerkUser.emailAddresses[0]?.emailAddress;
@@ -85,10 +94,7 @@ export class AuthService {
 
     // Tìm user theo clerkUserId (ưu tiên) hoặc email (phòng hờ account bị xóa trên Clerk nhưng còn kẹt trong DB)
     let user = await this.userRepo.findOne({
-      where: [
-        { clerkUserId },
-        { email }
-      ]
+      where: [{ clerkUserId }, { email }],
     });
 
     try {
@@ -116,7 +122,10 @@ export class AuthService {
       }
     } catch (saveError: any) {
       // Nếu có lỗi tranh chấp (Webhook vừa tạo user xong), thử query lại lần nữa
-      console.warn(`[AuthService] Onboard Race Condition detected for ${clerkUserId}:`, saveError.message);
+      console.warn(
+        `[AuthService] Onboard Race Condition detected for ${clerkUserId}:`,
+        saveError.message,
+      );
       user = await this.userRepo.findOne({
         where: [{ clerkUserId }, { email }],
       });
@@ -130,9 +139,10 @@ export class AuthService {
 
     // 3. Nếu định hướng (targetRole) là trở thành Giảng viên, cấp profile KYC trắng chờ duyệt
     if (targetRole === 'INSTRUCTOR') {
-      const existingInstructorProfile = await this.instructorProfileRepo.findOne({
-        where: { userId: user.id },
-      });
+      const existingInstructorProfile =
+        await this.instructorProfileRepo.findOne({
+          where: { userId: user.id },
+        });
 
       if (!existingInstructorProfile) {
         await this.instructorProfileRepo.save({

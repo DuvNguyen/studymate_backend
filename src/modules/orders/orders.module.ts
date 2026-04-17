@@ -12,7 +12,17 @@ import { Transaction } from '../../database/entities/transaction.entity';
 import { User } from '../../database/entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, Cart, Enrollment, Wallet, Transaction, User])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Order,
+      OrderItem,
+      Cart,
+      Enrollment,
+      Wallet,
+      Transaction,
+      User,
+    ]),
+  ],
   controllers: [OrdersController],
   providers: [OrdersService],
 })
