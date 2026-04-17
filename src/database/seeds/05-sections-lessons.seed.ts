@@ -23,8 +23,20 @@ export async function seedSectionsAndLessons(dataSource: DataSource) {
   const savedSection1 = await sectionRepo.save(section1);
 
   await lessonRepo.save([
-    { sectionId: savedSection1.id, title: 'Bài 1: Làm quen', isPreview: true, position: 1, durationSecs: 120 },
-    { sectionId: savedSection1.id, title: 'Bài 2: Cài đặt công cụ', isPreview: false, position: 2, durationSecs: 300 },
+    {
+      sectionId: savedSection1.id,
+      title: 'Bài 1: Làm quen',
+      isPreview: true,
+      position: 1,
+      durationSecs: 120,
+    },
+    {
+      sectionId: savedSection1.id,
+      title: 'Bài 2: Cài đặt công cụ',
+      isPreview: false,
+      position: 2,
+      durationSecs: 300,
+    },
   ]);
 
   // Tạo Section 2
@@ -36,8 +48,20 @@ export async function seedSectionsAndLessons(dataSource: DataSource) {
   const savedSection2 = await sectionRepo.save(section2);
 
   await lessonRepo.save([
-    { sectionId: savedSection2.id, title: 'Bài 3: Cấu trúc cơ bản', isPreview: false, position: 1, durationSecs: 400 },
-    { sectionId: savedSection2.id, title: 'Bài 4: Thực hành', isPreview: false, position: 2, durationSecs: 500 },
+    {
+      sectionId: savedSection2.id,
+      title: 'Bài 3: Cấu trúc cơ bản',
+      isPreview: false,
+      position: 1,
+      durationSecs: 400,
+    },
+    {
+      sectionId: savedSection2.id,
+      title: 'Bài 4: Thực hành',
+      isPreview: false,
+      position: 2,
+      durationSecs: 500,
+    },
   ]);
 
   console.log('Seed Sections & Lessons cho Course 1 thành công.');

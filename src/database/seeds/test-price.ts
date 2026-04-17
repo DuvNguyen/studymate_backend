@@ -22,17 +22,36 @@ async function updateTestPrice() {
     type: 'postgres',
     url: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    entities: [User, Role, Category, Profile, InstructorProfile, InstructorDocument, StaffProfile, Course, Section, Lesson, Video, QuestionBank, QuestionBankQuestion, QuestionBankOption, Exam, ExamSectionConfig],
+    entities: [
+      User,
+      Role,
+      Category,
+      Profile,
+      InstructorProfile,
+      InstructorDocument,
+      StaffProfile,
+      Course,
+      Section,
+      Lesson,
+      Video,
+      QuestionBank,
+      QuestionBankQuestion,
+      QuestionBankOption,
+      Exam,
+      ExamSectionConfig,
+    ],
   });
 
   await dataSource.initialize();
   console.log('Connected to DB');
 
   const courseRepo = dataSource.getRepository(Course);
-  
+
   // Update the first course found or a specific one
-  const course = await courseRepo.findOne({ where: { slug: 'financial-accounting' } });
-  
+  const course = await courseRepo.findOne({
+    where: { slug: 'financial-accounting' },
+  });
+
   if (course) {
     course.price = 10000;
     course.title = 'TEST COURSE';

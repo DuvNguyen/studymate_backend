@@ -30,10 +30,16 @@ export class WishlistController {
     @Param('courseId', ParseIntPipe) courseId: number,
     @Body('status') status?: boolean,
   ) {
-    const result = await this.wishlistService.toggleWishlist(user.id, courseId, status);
-    return { 
-      data: result, 
-      message: result.isInWishlist ? 'Đã thêm vào danh sách yêu thích' : 'Đã xóa khỏi danh sách yêu thích' 
+    const result = await this.wishlistService.toggleWishlist(
+      user.id,
+      courseId,
+      status,
+    );
+    return {
+      data: result,
+      message: result.isInWishlist
+        ? 'Đã thêm vào danh sách yêu thích'
+        : 'Đã xóa khỏi danh sách yêu thích',
     };
   }
 
@@ -43,6 +49,9 @@ export class WishlistController {
     @Param('courseId', ParseIntPipe) courseId: number,
   ) {
     const result = await this.wishlistService.checkWishlist(user.id, courseId);
-    return { data: result, message: 'Kiểm tra trạng thái yêu thích thành công' };
+    return {
+      data: result,
+      message: 'Kiểm tra trạng thái yêu thích thành công',
+    };
   }
 }

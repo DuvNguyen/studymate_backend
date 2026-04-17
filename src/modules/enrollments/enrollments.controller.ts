@@ -1,4 +1,11 @@
-import { Controller, Get, Post, Body, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { EnrollmentsService } from './enrollments.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -13,7 +20,9 @@ export class EnrollmentsController {
   constructor(private readonly enrollmentsService: EnrollmentsService) {}
 
   @Get('my-courses')
-  async getMyCourses(@CurrentUser() user: User): Promise<EnrollmentResponseDto[]> {
+  async getMyCourses(
+    @CurrentUser() user: User,
+  ): Promise<EnrollmentResponseDto[]> {
     return this.enrollmentsService.findMyCourses(user);
   }
 

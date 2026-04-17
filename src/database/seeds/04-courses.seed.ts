@@ -15,9 +15,14 @@ export async function seedSampleCourse(dataSource: DataSource) {
   const categoryRepo = dataSource.getRepository(Category);
 
   // 1. Tìm hoặc chuẩn bị dữ liệu phụ thuộc
-  let course = await courseRepo.findOne({ where: { slug: 'financial-accounting' } });
-  
-  const instructor = await userRepo.findOne({ where: { role: { roleName: 'INSTRUCTOR' } }, relations: ['role'] });
+  let course = await courseRepo.findOne({
+    where: { slug: 'financial-accounting' },
+  });
+
+  const instructor = await userRepo.findOne({
+    where: { role: { roleName: 'INSTRUCTOR' } },
+    relations: ['role'],
+  });
   const firstUser = await userRepo.findOne({ where: {} });
   const category = await categoryRepo.findOne({ where: {} });
 
@@ -29,7 +34,9 @@ export async function seedSampleCourse(dataSource: DataSource) {
   const theInstructor = instructor || firstUser;
 
   // 2. Tạo hoặc lấy video
-  let video1 = await videoRepo.findOne({ where: { storageKey: 'mock-youtube-1' } });
+  let video1 = await videoRepo.findOne({
+    where: { storageKey: 'mock-youtube-1' },
+  });
   if (!video1) {
     video1 = videoRepo.create({
       uploaderId: theInstructor.id,
@@ -41,7 +48,9 @@ export async function seedSampleCourse(dataSource: DataSource) {
     await videoRepo.save(video1);
   }
 
-  let video2 = await videoRepo.findOne({ where: { storageKey: 'mock-youtube-2' } });
+  let video2 = await videoRepo.findOne({
+    where: { storageKey: 'mock-youtube-2' },
+  });
   if (!video2) {
     video2 = videoRepo.create({
       uploaderId: theInstructor.id,
@@ -53,7 +62,9 @@ export async function seedSampleCourse(dataSource: DataSource) {
     await videoRepo.save(video2);
   }
 
-  let video3 = await videoRepo.findOne({ where: { storageKey: 'mock-youtube-3' } });
+  let video3 = await videoRepo.findOne({
+    where: { storageKey: 'mock-youtube-3' },
+  });
   if (!video3) {
     video3 = videoRepo.create({
       uploaderId: theInstructor.id,
@@ -85,7 +96,8 @@ export async function seedSampleCourse(dataSource: DataSource) {
     avgRating: 4.7,
     reviewCount: 5022,
     publishedAt: new Date(),
-    thumbnailUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=1200&auto=format&fit=crop',
+    thumbnailUrl:
+      'https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=1200&auto=format&fit=crop',
   };
 
   if (course) {
@@ -96,9 +108,13 @@ export async function seedSampleCourse(dataSource: DataSource) {
   await courseRepo.save(course);
 
   // 4. Kiểm tra Section để tránh duplicate
-  const existingSections = await sectionRepo.find({ where: { courseId: course.id } });
+  const existingSections = await sectionRepo.find({
+    where: { courseId: course.id },
+  });
   if (existingSections.length > 0) {
-    console.log(`Course ${course.title} already has sections. Skipping content seed.`);
+    console.log(
+      `Course ${course.title} already has sections. Skipping content seed.`,
+    );
     return;
   }
 
@@ -118,7 +134,7 @@ export async function seedSampleCourse(dataSource: DataSource) {
     isPreview: true,
     durationSecs: 259,
   });
-  
+
   const lesson1_2 = lessonRepo.create({
     sectionId: section1.id,
     title: 'Meet Your Instructor and Introduction to Course',

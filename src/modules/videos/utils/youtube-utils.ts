@@ -4,9 +4,11 @@ export class YoutubeUtils {
    * @param durationStr Chuỗi thời lượng ISO 8601
    * @returns Tổng số giây
    */
-  static parseDurationToSeconds(durationStr: string | null | undefined): number {
+  static parseDurationToSeconds(
+    durationStr: string | null | undefined,
+  ): number {
     if (!durationStr) return 0;
-    
+
     // Biểu thức chính quy tách Giờ, Phút, Giây
     const match = durationStr.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
     if (!match) return 0;

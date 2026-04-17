@@ -21,7 +21,9 @@ export class UploadsService {
         (error, result) => {
           if (error) {
             console.error('Lỗi Cloudinary:', error);
-            return reject(new BadRequestException('Lỗi tải ảnh: ' + error.message));
+            return reject(
+              new BadRequestException('Lỗi tải ảnh: ' + error.message),
+            );
           }
           resolve(result as unknown as CloudinaryResponse);
         },

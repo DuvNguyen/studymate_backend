@@ -1,4 +1,13 @@
-import { Controller, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -14,7 +23,14 @@ export class LessonsController {
   async createLesson(
     @Req() req,
     @Param('sectionId') sectionId: number,
-    @Body() dto: { title: string; videoId?: number; content?: string; isPreview?: boolean; position?: number },
+    @Body()
+    dto: {
+      title: string;
+      videoId?: number;
+      content?: string;
+      isPreview?: boolean;
+      position?: number;
+    },
   ) {
     return this.lessonsService.createLesson(req.user.id, sectionId, dto);
   }
@@ -23,7 +39,14 @@ export class LessonsController {
   async updateLesson(
     @Req() req,
     @Param('id') id: number,
-    @Body() dto: { title?: string; videoId?: number; content?: string; isPreview?: boolean; position?: number },
+    @Body()
+    dto: {
+      title?: string;
+      videoId?: number;
+      content?: string;
+      isPreview?: boolean;
+      position?: number;
+    },
   ) {
     return this.lessonsService.updateLesson(req.user.id, id, dto);
   }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Lesson } from '../../database/entities/lesson.entity';
@@ -16,7 +20,17 @@ export class LessonsService {
     private readonly videosRepository: Repository<Video>,
   ) {}
 
-  async createLesson(instructorId: number, sectionId: number, dto: { title: string; videoId?: number; content?: string; isPreview?: boolean; position?: number }) {
+  async createLesson(
+    instructorId: number,
+    sectionId: number,
+    dto: {
+      title: string;
+      videoId?: number;
+      content?: string;
+      isPreview?: boolean;
+      position?: number;
+    },
+  ) {
     const section = await this.sectionsRepository.findOne({
       where: { id: sectionId },
       relations: ['course'],
@@ -28,8 +42,17 @@ export class LessonsService {
 
     let defaultDuration = 0;
     if (dto.videoId) {
-      const video = await this.videosRepository.findOne({ where: { id: dto.videoId, uploaderId: instructorId, status: 'APPROVED' as any } });
-      if (!video) throw new BadRequestException('Video cannot be attached. Make sure it is approved and belongs to you.');
+      const video = await this.videosRepository.findOne({
+        where: {
+          id: dto.videoId,
+          uploaderId: instructorId,
+          status: 'APPROVED' as any,
+        },
+      });
+      if (!video)
+        throw new BadRequestException(
+          'Video cannot be attached. Make sure it is approved and belongs to you.',
+        );
       defaultDuration = video.durationSecs || 0;
     }
 
@@ -54,7 +77,17 @@ export class LessonsService {
     return this.lessonsRepository.save(lesson);
   }
 
-  async updateLesson(instructorId: number, id: number, dto: { title?: string; videoId?: number; content?: string; isPreview?: boolean; position?: number }) {
+  async updateLesson(
+    instructorId: number,
+    id: number,
+    dto: {
+      title?: string;
+      videoId?: number;
+      content?: string;
+      isPreview?: boolean;
+      position?: number;
+    },
+  ) {
     const lesson = await this.lessonsRepository.findOne({
       where: { id },
       relations: ['section', 'section.course'],
@@ -69,8 +102,17 @@ export class LessonsService {
         lesson.videoId = null;
         lesson.durationSecs = 0;
       } else {
-        const video = await this.videosRepository.findOne({ where: { id: dto.videoId, uploaderId: instructorId, status: 'APPROVED' as any } });
-        if (!video) throw new BadRequestException('Video cannot be attached. Make sure it is approved and belongs to you.');
+        const video = await this.videosRepository.findOne({
+          where: {
+            id: dto.videoId,
+            uploaderId: instructorId,
+            status: 'APPROVED' as any,
+          },
+        });
+        if (!video)
+          throw new BadRequestException(
+            'Video cannot be attached. Make sure it is approved and belongs to you.',
+          );
         lesson.videoId = dto.videoId;
         lesson.durationSecs = video.durationSecs || 0;
       }

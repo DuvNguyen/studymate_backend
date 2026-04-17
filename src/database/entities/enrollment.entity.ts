@@ -63,5 +63,5 @@ export class Enrollment {
   last_accessed_at: Date;
 
   @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
-  completed_at: Date;
+  completed_at: Date | null;
 }

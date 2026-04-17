@@ -20,13 +20,28 @@ export class Wallet {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0, name: 'balance_pending' })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'balance_pending',
+  })
   balance_pending: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0, name: 'balance_available' })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'balance_available',
+  })
   balance_available: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0, name: 'total_earned' })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'total_earned',
+  })
   total_earned: number;
 
   @UpdateDateColumn({ name: 'updated_at' })

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Enrollment } from '../../database/entities/enrollment.entity';
@@ -22,19 +26,23 @@ export class EnrollmentsService {
         order: { enrolled_at: 'DESC' },
       });
 
-      console.log(`[EnrollmentsService] Found ${enrollments.length} enrollments`);
+      console.log(
+        `[EnrollmentsService] Found ${enrollments.length} enrollments`,
+      );
 
-      return enrollments.map(e => {
+      return enrollments.map((e) => {
         const data = {
           ...e,
           course: {
             ...e.course,
-            instructor_name: e.course.instructor?.profile 
+            instructor_name: e.course.instructor?.profile
               ? e.course.instructor.profile.fullName
               : 'Instructor',
-          }
+          },
         };
-        return plainToInstance(EnrollmentResponseDto, data, { excludeExtraneousValues: true });
+        return plainToInstance(EnrollmentResponseDto, data, {
+          excludeExtraneousValues: true,
+        });
       });
     } catch (error: any) {
       console.error(`[EnrollmentsService] Error fetching courses:`, error);
@@ -60,7 +68,9 @@ export class EnrollmentsService {
       where: { student_id: studentId, course_id: courseId, is_active: true },
     });
     if (existing)
-      throw new BadRequestException('Người dùng đã được ghi danh vào khóa học này');
+      throw new BadRequestException(
+        'Người dùng đã được ghi danh vào khóa học này',
+      );
 
     const enrollment = this.enrollmentsRepo.create({
       student_id: studentId,

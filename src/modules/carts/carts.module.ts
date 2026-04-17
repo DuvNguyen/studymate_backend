@@ -10,7 +10,9 @@ import { Enrollment } from '../../database/entities/enrollment.entity';
 import { User } from '../../database/entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Cart, CartItem, Course, Enrollment, User])],
+  imports: [
+    TypeOrmModule.forFeature([Cart, CartItem, Course, Enrollment, User]),
+  ],
   controllers: [CartsController],
   providers: [CartsService],
 })

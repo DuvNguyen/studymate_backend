@@ -18,6 +18,9 @@ export class LessonDto {
 
   @Expose()
   position: number;
+
+  @Expose()
+  content: string | null;
 }
 
 export class SectionDto {

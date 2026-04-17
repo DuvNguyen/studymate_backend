@@ -8,13 +8,22 @@ import { Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { Role } from '../../database/entities/role.entity';
 import { Profile } from '../../database/entities/profile.entity';
-import { InstructorProfile, KycStatus } from '../../database/entities/instructor-profile.entity';
+import {
+  InstructorProfile,
+  KycStatus,
+} from '../../database/entities/instructor-profile.entity';
 import { InstructorDocument } from '../../database/entities/instructor-document.entity';
-import { StaffProfile, StaffDepartment } from '../../database/entities/staff-profile.entity';
+import {
+  StaffProfile,
+  StaffDepartment,
+} from '../../database/entities/staff-profile.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateKycDto } from './dto/update-kyc.dto';
 import { UpdateStaffProfileDto } from './dto/update-staff-profile.dto';
-import { UpdateUserStatusDto, UpdateUserRoleDto } from './dto/update-user-admin.dto';
+import {
+  UpdateUserStatusDto,
+  UpdateUserRoleDto,
+} from './dto/update-user-admin.dto';
 import { createClerkClient } from '@clerk/backend';
 
 export interface PaginationMeta {
@@ -66,16 +75,26 @@ export class UsersService {
 
     // Nếu chưa có profile (do lỗi sync), tự tạo 1 cái rỗng
     if (!user.profile) {
-       user.profile = this.profileRepo.create({ userId: user.id });
+      user.profile = this.profileRepo.create({ userId: user.id });
     }
 
     if (dto.firstName !== undefined || dto.lastName !== undefined) {
       // fullName = firstName + lastName
-      const fName = dto.firstName !== undefined ? dto.firstName : (user.profile.fullName ? user.profile.fullName.split(' ')[0] : '');
-      const lName = dto.lastName !== undefined ? dto.lastName : (user.profile.fullName ? user.profile.fullName.split(' ').slice(1).join(' ') : '');
+      const fName =
+        dto.firstName !== undefined
+          ? dto.firstName
+          : user.profile.fullName
+            ? user.profile.fullName.split(' ')[0]
+            : '';
+      const lName =
+        dto.lastName !== undefined
+          ? dto.lastName
+          : user.profile.fullName
+            ? user.profile.fullName.split(' ').slice(1).join(' ')
+            : '';
       user.profile.fullName = `${fName} ${lName}`.trim();
     }
-    
+
     if (dto.bio !== undefined) user.profile.bio = dto.bio;
     if (dto.avatarUrl !== undefined) user.avatarUrl = dto.avatarUrl;
 
@@ -95,7 +114,9 @@ export class UsersService {
 
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     if (!['INSTRUCTOR', 'USER'].includes(user.role?.roleName || '')) {
-      throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên hoặc Tài khoản đang chờ cấp phép');
+      throw new ForbiddenException(
+        'Tính năng này chỉ dành cho Giảng viên hoặc Tài khoản đang chờ cấp phép',
+      );
     }
 
     let profile = user.instructorProfile;
@@ -126,7 +147,9 @@ export class UsersService {
 
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     if (!['INSTRUCTOR', 'USER'].includes(user.role?.roleName || '')) {
-      throw new ForbiddenException('Tính năng này chỉ dành cho Giảng viên hoặc Tài khoản đang chờ cấp phép');
+      throw new ForbiddenException(
+        'Tính năng này chỉ dành cho Giảng viên hoặc Tài khoản đang chờ cấp phép',
+      );
     }
 
     let profile = user.instructorProfile;
@@ -136,11 +159,13 @@ export class UsersService {
 
     // Cập nhật thông tin profile
     if (dto.idCardUrl !== undefined) profile.idCardUrl = dto.idCardUrl;
-    if (dto.bankAccountName !== undefined) profile.bankAccountName = dto.bankAccountName;
-    if (dto.bankAccountNumber !== undefined) profile.bankAccountNumber = dto.bankAccountNumber;
+    if (dto.bankAccountName !== undefined)
+      profile.bankAccountName = dto.bankAccountName;
+    if (dto.bankAccountNumber !== undefined)
+      profile.bankAccountNumber = dto.bankAccountNumber;
     if (dto.bankName !== undefined) profile.bankName = dto.bankName;
     if (dto.certificates !== undefined) profile.certificates = dto.certificates;
-    
+
     // Đang PENDING chuyển thành PENDING_REVIEW (hoặc giữ nguyên để chờ Admin)
     profile.kycStatus = KycStatus.PENDING; // Tạm khóa trạng thái
     await this.instructorProfileRepo.save(profile);
@@ -148,10 +173,12 @@ export class UsersService {
     // Cập nhật Document: Xoá cũ, Thêm mới (Cơ bản)
     if (dto.documents && dto.documents.length > 0) {
       await this.instructorDocumentRepo.delete({ userId: user.id });
-      const newDocs = dto.documents.map(doc => this.instructorDocumentRepo.create({
-        userId: user.id,
-        ...doc,
-      }));
+      const newDocs = dto.documents.map((doc) =>
+        this.instructorDocumentRepo.create({
+          userId: user.id,
+          ...doc,
+        }),
+      );
       await this.instructorDocumentRepo.save(newDocs);
     }
 
@@ -167,13 +194,16 @@ export class UsersService {
     });
 
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-    if (user.roleId !== 3 && user.roleId !== 4) throw new ForbiddenException('Tính năng này chỉ dành cho Nhân viên hoặc Quản trị viên');
+    if (user.roleId !== 3 && user.roleId !== 4)
+      throw new ForbiddenException(
+        'Tính năng này chỉ dành cho Nhân viên hoặc Quản trị viên',
+      );
 
     let profile = user.staffProfile;
     if (!profile) {
       profile = await this.staffProfileRepo.save({
         userId: user.id,
-        fullName: user.email.split('@')[0], 
+        fullName: user.email.split('@')[0],
         department: StaffDepartment.SUPPORT,
       });
     }
@@ -188,7 +218,10 @@ export class UsersService {
     });
 
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
-    if (user.roleId !== 3 && user.roleId !== 4) throw new ForbiddenException('Tính năng này chỉ dành cho Nhân viên hoặc Quản trị viên');
+    if (user.roleId !== 3 && user.roleId !== 4)
+      throw new ForbiddenException(
+        'Tính năng này chỉ dành cho Nhân viên hoặc Quản trị viên',
+      );
 
     let profile = user.staffProfile;
     if (!profile) {
@@ -216,20 +249,22 @@ export class UsersService {
     if (status && status !== 'ALL') {
       qb.where('instructorProfile.kyc_status = :status', { status });
     }
-    
+
     qb.orderBy('user.createdAt', 'DESC');
-    
+
     const users = await qb.getMany();
-    return users.map(u => {
+    return users.map((u) => {
       const publicProfile = this.toPublicProfile(u);
       return {
         ...publicProfile,
-        instructorProfile: u.instructorProfile ? {
-          ...publicProfile.instructorProfile,
-          idCardUrl: u.instructorProfile.idCardUrl,
-          bankAccountName: u.instructorProfile.bankAccountName,
-          bankAccountNumber: u.instructorProfile.bankAccountNumber,
-        } : null,
+        instructorProfile: u.instructorProfile
+          ? {
+              ...publicProfile.instructorProfile,
+              idCardUrl: u.instructorProfile.idCardUrl,
+              bankAccountName: u.instructorProfile.bankAccountName,
+              bankAccountNumber: u.instructorProfile.bankAccountNumber,
+            }
+          : null,
       };
     });
   }
@@ -239,15 +274,18 @@ export class UsersService {
       where: { id: targetId },
       relations: ['instructorProfile', 'role'],
     });
-    if (!user || !user.instructorProfile) throw new NotFoundException('Không tìm thấy giảng viên hoặc KYC');
-    
+    if (!user || !user.instructorProfile)
+      throw new NotFoundException('Không tìm thấy giảng viên hoặc KYC');
+
     user.instructorProfile.kycStatus = status;
     user.instructorProfile.rejectionReason = reason || '';
     await this.instructorProfileRepo.save(user.instructorProfile);
 
     // Nếu Approve, cập nhật Role của User lên INSTRUCTOR
     if (status === KycStatus.APPROVED) {
-      const instructorRole = await this.roleRepo.findOne({ where: { roleName: 'INSTRUCTOR' }});
+      const instructorRole = await this.roleRepo.findOne({
+        where: { roleName: 'INSTRUCTOR' },
+      });
       if (instructorRole && user.roleId !== instructorRole.id) {
         user.roleId = instructorRole.id;
         user.role = instructorRole;
@@ -255,7 +293,9 @@ export class UsersService {
 
         // Sync cho Clerk SDK
         try {
-          const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+          const clerk = createClerkClient({
+            secretKey: process.env.CLERK_SECRET_KEY,
+          });
           await clerk.users.updateUserMetadata(user.clerkUserId, {
             publicMetadata: { role: 'INSTRUCTOR' },
           });
@@ -267,10 +307,12 @@ export class UsersService {
       // Nếu REJECTED và user vẫn chỉ trơ trọi quyền USER (chưa từng duyệt bao giờ) => xóa trắng tài khoản.
       if (user.role?.roleName === 'USER') {
         await this.deleteUser(targetId);
-        return { message: 'Tài khoản giả mạo/không hợp lệ đã bị xóa khỏi hệ thống.' };
+        return {
+          message: 'Tài khoản giả mạo/không hợp lệ đã bị xóa khỏi hệ thống.',
+        };
       }
     }
-    
+
     return this.toPublicProfile(user);
   }
 
@@ -294,7 +336,7 @@ export class UsersService {
       .take(limit);
 
     if (role) {
-      qb.andWhere('role.role_name = :role', { role: role as string });
+      qb.andWhere('role.role_name = :role', { role: role });
     }
     if (status) {
       qb.andWhere('user.status = :status', { status });
@@ -322,7 +364,12 @@ export class UsersService {
   async findOneById(id: number) {
     const user = await this.userRepo.findOne({
       where: { id },
-      relations: ['role', 'profile', 'instructorProfile', 'instructorDocuments'],
+      relations: [
+        'role',
+        'profile',
+        'instructorProfile',
+        'instructorDocuments',
+      ],
     });
     if (!user) throw new NotFoundException(`Không tìm thấy user #${id}`);
     return this.toPublicProfile(user);
@@ -339,12 +386,17 @@ export class UsersService {
       where: { id: targetId },
       relations: ['role'],
     });
-    if (!target) throw new NotFoundException(`Không tìm thấy user #${targetId}`);
+    if (!target)
+      throw new NotFoundException(`Không tìm thấy user #${targetId}`);
     if (target.id === requestor.id) {
-      throw new ForbiddenException('Không thể tự thay đổi trạng thái của chính mình');
+      throw new ForbiddenException(
+        'Không thể tự thay đổi trạng thái của chính mình',
+      );
     }
     if (target.role?.roleName === 'ADMIN') {
-      throw new ForbiddenException('Không thể thay đổi trạng thái của Quản trị viên khác');
+      throw new ForbiddenException(
+        'Không thể thay đổi trạng thái của Quản trị viên khác',
+      );
     }
 
     target.status = dto.status;
@@ -386,25 +438,25 @@ export class UsersService {
     return this.toPublicProfile(user);
   }
 
-  async updateRole(
-    targetId: number,
-    dto: UpdateUserRoleDto,
-    requestor: User,
-  ) {
+  async updateRole(targetId: number, dto: UpdateUserRoleDto, requestor: User) {
     const target = await this.userRepo.findOne({
       where: { id: targetId },
       relations: ['role'],
     });
-    if (!target) throw new NotFoundException(`Không tìm thấy user #${targetId}`);
+    if (!target)
+      throw new NotFoundException(`Không tìm thấy user #${targetId}`);
     if (target.id === requestor.id) {
       throw new ForbiddenException('Không thể tự thay đổi role của chính mình');
     }
     if (target.role?.roleName === 'ADMIN') {
-      throw new ForbiddenException('Không thể thay đổi role của Quản trị viên khác');
+      throw new ForbiddenException(
+        'Không thể thay đổi role của Quản trị viên khác',
+      );
     }
 
     const role = await this.roleRepo.findOne({ where: { id: dto.roleId } });
-    if (!role) throw new NotFoundException(`Không tìm thấy role #${dto.roleId}`);
+    if (!role)
+      throw new NotFoundException(`Không tìm thấy role #${dto.roleId}`);
 
     target.roleId = role.id;
     target.role = role;
@@ -412,10 +464,59 @@ export class UsersService {
     return this.toPublicProfile(target);
   }
 
+  async getPublicPortfolio(userId: number, query?: { page?: number; limit?: number }) {
+    const page = Number(query?.page) || 1;
+    const limit = Number(query?.limit) || 6;
+    const skip = (page - 1) * limit;
+
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: [
+        'role',
+        'profile',
+        'instructorProfile',
+        'courses',
+        'courses.category',
+      ],
+    });
+
+    if (!user) throw new NotFoundException('Không tìm thấy giảng viên');
+    if (user.role?.roleName !== 'INSTRUCTOR') {
+      throw new ForbiddenException('Người dùng này không phải là giảng viên');
+    }
+
+    return {
+      id: user.id,
+      fullName: user.profile?.fullName ?? 'Giảng viên StudyMate',
+      avatarUrl: user.avatarUrl,
+      bio: user.profile?.bio ?? 'Chưa có thông tin giới thiệu.',
+      certificates: user.instructorProfile?.certificates || [],
+      courses: (user.courses || [])
+        .filter((c) => c.status === 'PUBLISHED')
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(skip, skip + limit)
+        .map((c) => ({
+          id: c.id,
+          title: c.title,
+          slug: c.slug,
+          thumbnailUrl: c.thumbnailUrl,
+          price: Number(c.price),
+          level: c.level,
+          categoryName: c.category?.name,
+        })),
+      totalCourses: (user.courses || []).filter((c) => c.status === 'PUBLISHED')
+        .length,
+      createdAt: user.createdAt,
+    };
+  }
+
   // ─── Xóa User ───────────────────────────────────────────────────────────────
 
   async deleteUser(id: number, requestor?: User) {
-    const user = await this.userRepo.findOne({ where: { id }, relations: ['role'] });
+    const user = await this.userRepo.findOne({
+      where: { id },
+      relations: ['role'],
+    });
     if (!user) {
       throw new NotFoundException(`Không tìm thấy user #${id}`);
     }
@@ -425,10 +526,15 @@ export class UsersService {
 
     // 1. Xóa trên Clerk để giải phóng Email
     try {
-      const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+      const clerk = createClerkClient({
+        secretKey: process.env.CLERK_SECRET_KEY,
+      });
       await clerk.users.deleteUser(user.clerkUserId);
     } catch (error: any) {
-      console.warn(`[deleteUser] Lỗi hoặc user không tồn tại trên Clerk:`, error.message);
+      console.warn(
+        `[deleteUser] Lỗi hoặc user không tồn tại trên Clerk:`,
+        error.message,
+      );
       // Vẫn tiếp tục thực hiện xóa local để đảm bảo đồng bộ
     }
 
@@ -440,9 +546,13 @@ export class UsersService {
   // ─── Helper ─────────────────────────────────────────────────────────────────
 
   private toPublicProfile(user: User) {
-    const fName = user.profile?.fullName ? user.profile.fullName.split(' ')[0] : null;
-    const lName = user.profile?.fullName ? user.profile.fullName.split(' ').slice(1).join(' ') : null;
-    
+    const fName = user.profile?.fullName
+      ? user.profile.fullName.split(' ')[0]
+      : null;
+    const lName = user.profile?.fullName
+      ? user.profile.fullName.split(' ').slice(1).join(' ')
+      : null;
+
     return {
       id: user.id,
       clerkUserId: user.clerkUserId,
@@ -459,12 +569,14 @@ export class UsersService {
       banReason: user.banReason ?? null,
       bannedAt: user.bannedAt ?? null,
       unbannedAt: user.unbannedAt ?? null,
-      instructorProfile: user.instructorProfile ? {
-        bankName: user.instructorProfile.bankName,
-        kycStatus: user.instructorProfile.kycStatus,
-        certificates: user.instructorProfile.certificates,
-        documents: user.instructorDocuments || [],
-      } : null,
+      instructorProfile: user.instructorProfile
+        ? {
+            bankName: user.instructorProfile.bankName,
+            kycStatus: user.instructorProfile.kycStatus,
+            certificates: user.instructorProfile.certificates,
+            documents: user.instructorDocuments || [],
+          }
+        : null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

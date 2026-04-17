@@ -9,6 +9,7 @@ import { Profile } from '../../database/entities/profile.entity';
 import { InstructorProfile } from '../../database/entities/instructor-profile.entity';
 import { StaffProfile } from '../../database/entities/staff-profile.entity';
 import { InstructorDocument } from '../../database/entities/instructor-document.entity';
+import { PublicUsersController } from './public-users.controller';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { InstructorDocument } from '../../database/entities/instructor-document.
     ]),
     AuthModule, // tái dùng ClerkAuthGuard
   ],
-  controllers: [UsersController],
+  controllers: [UsersController, PublicUsersController],
   providers: [UsersService],
   exports: [UsersService],
 })

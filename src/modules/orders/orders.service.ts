@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
@@ -15,7 +19,7 @@ export class OrdersService {
   constructor(
     @InjectRepository(Cart) private cartsRepo: Repository<Cart>,
     @InjectRepository(Order) private ordersRepo: Repository<Order>,
-    private dataSource: DataSource
+    private dataSource: DataSource,
   ) {}
 
   async checkoutParams(user: User) {
@@ -51,11 +55,13 @@ export class OrdersService {
       for (const item of cart.cart_items) {
         const course = item.course;
         if (!course || course.status !== CourseStatus.PUBLISHED) {
-          throw new BadRequestException(`Khóa học ${course?.title || 'Unknown'} không khả dụng`);
+          throw new BadRequestException(
+            `Khóa học ${course?.title || 'Unknown'} không khả dụng`,
+          );
         }
 
         const price = Number(course.price);
-        const commissionRate = 0.20; // 20% platform fee
+        const commissionRate = 0.2; // 20% platform fee
         const platformFee = price * commissionRate;
         const instructorAmount = price - platformFee;
 
@@ -70,7 +76,7 @@ export class OrdersService {
           platform_fee: platformFee,
           instructor_amount: instructorAmount,
         });
-        
+
         await queryRunner.manager.save(orderItem);
         totalAmount += price;
       }
@@ -108,7 +114,8 @@ export class OrdersService {
       });
 
       if (!order) throw new NotFoundException('Order not found');
-      if (order.status === OrderStatus.COMPLETED) throw new BadRequestException('Order already completed');
+      if (order.status === OrderStatus.COMPLETED)
+        throw new BadRequestException('Order already completed');
 
       order.status = OrderStatus.COMPLETED;
       order.completed_at = new Date();
@@ -128,7 +135,7 @@ export class OrdersService {
 
         // 2. Instructor Wallet & Transaction
         let wallet: Wallet | null = await queryRunner.manager.findOne(Wallet, {
-          where: { user_id: item.instructor_id }
+          where: { user_id: item.instructor_id },
         });
 
         if (!wallet) {
@@ -137,7 +144,7 @@ export class OrdersService {
             balance_pending: 0,
             balance_available: 0,
             total_earned: 0,
-          }) as Wallet;
+          });
           await queryRunner.manager.save(wallet);
         }
 
@@ -145,8 +152,10 @@ export class OrdersService {
         const lockedUntil = new Date();
         lockedUntil.setDate(lockedUntil.getDate() + 15);
 
-        wallet.balance_pending = Number(wallet.balance_pending) + Number(item.instructor_amount);
-        wallet.total_earned = Number(wallet.total_earned) + Number(item.instructor_amount);
+        wallet.balance_pending =
+          Number(wallet.balance_pending) + Number(item.instructor_amount);
+        wallet.total_earned =
+          Number(wallet.total_earned) + Number(item.instructor_amount);
         await queryRunner.manager.save(wallet);
 
         const transaction = queryRunner.manager.create(Transaction, {

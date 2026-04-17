@@ -40,7 +40,10 @@ export class ClerkAuthGuard implements CanActivate {
       console.error('[ClerkAuthGuard] verifyToken FAILED!');
       console.error('[ClerkAuthGuard] Error Name:', err?.name);
       console.error('[ClerkAuthGuard] Error Message:', err?.message);
-      console.error('[ClerkAuthGuard] Token prefix:', token ? token.substring(0, 10) + '...' : 'NONE');
+      console.error(
+        '[ClerkAuthGuard] Token prefix:',
+        token ? token.substring(0, 10) + '...' : 'NONE',
+      );
       throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
     }
   }

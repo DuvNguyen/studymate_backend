@@ -15,7 +15,10 @@ import { Video, VideoStatus } from '../../database/entities/video.entity';
 import { VideoResponseDto } from './dto/video-response.dto';
 import { YoutubeUtils } from './utils/youtube-utils';
 import { VideoQueryDto } from './dto/video-query.dto';
-import { PaginatedVideosDto, PaginationMetaDto } from './dto/paginated-videos.dto';
+import {
+  PaginatedVideosDto,
+  PaginationMetaDto,
+} from './dto/paginated-videos.dto';
 
 @Injectable()
 export class VideosService {
@@ -95,10 +98,10 @@ export class VideosService {
     // Lưu vào DB với status PROCESSING — chờ hệ thống tự động kiểm duyệt
     const video = this.videosRepository.create({
       uploaderId,
-      storageKey: youtubeVideoId,        // YouTube video ID làm storage key
+      storageKey: youtubeVideoId, // YouTube video ID làm storage key
       youtubeVideoId,
       title: title ?? file.originalname,
-      cdnUrl: null,                       // Sẽ có sau khi APPROVED
+      cdnUrl: null, // Sẽ có sau khi APPROVED
       fileSizeKb: Math.round(file.size / 1024),
       status: VideoStatus.PROCESSING,
     });
@@ -127,7 +130,10 @@ export class VideosService {
 
   // ─── Controller Methods ────────────────────────────────────────────────────
 
-  async getInstructorVideos(instructorId: number, query: VideoQueryDto): Promise<PaginatedVideosDto> {
+  async getInstructorVideos(
+    instructorId: number,
+    query: VideoQueryDto,
+  ): Promise<PaginatedVideosDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 5;
     const skip = (page - 1) * limit;
@@ -167,7 +173,9 @@ export class VideosService {
       .where('video.status = :status', { status: VideoStatus.PENDING_REVIEW });
 
     if (query.uploaderId) {
-      qb.andWhere('video.uploaderId = :uploaderId', { uploaderId: query.uploaderId });
+      qb.andWhere('video.uploaderId = :uploaderId', {
+        uploaderId: query.uploaderId,
+      });
     }
 
     if (query.id) {
@@ -175,12 +183,12 @@ export class VideosService {
     }
 
     if (query.status && query.status !== 'ALL') {
-       qb.andWhere('video.status = :customStatus', { customStatus: query.status });
+      qb.andWhere('video.status = :customStatus', {
+        customStatus: query.status,
+      });
     }
 
-    qb.orderBy('video.uploadedAt', 'ASC')
-      .skip(skip)
-      .take(limit);
+    qb.orderBy('video.uploadedAt', 'ASC').skip(skip).take(limit);
 
     const [videos, total] = await qb.getManyAndCount();
 
@@ -205,9 +213,11 @@ export class VideosService {
     status: VideoStatus,
     reason?: string,
   ): Promise<VideoResponseDto> {
-    const video = await this.videosRepository.findOne({ where: { id: videoId } });
+    const video = await this.videosRepository.findOne({
+      where: { id: videoId },
+    });
     if (!video) throw new NotFoundException('Video không tồn tại');
-    
+
     if (video.status !== VideoStatus.PENDING_REVIEW) {
       throw new BadRequestException('Video không ở trạng thái chờ duyệt');
     }
@@ -254,11 +264,13 @@ export class VideosService {
 
     if (pendingVideos.length === 0) return;
 
-    this.logger.log(`Tự động kiểm tra ${pendingVideos.length} video đang PROCESSING (Auto-Validation)...`);
+    this.logger.log(
+      `Tự động kiểm tra ${pendingVideos.length} video đang PROCESSING (Auto-Validation)...`,
+    );
 
     for (const video of pendingVideos) {
       if (!video.youtubeVideoId) continue;
-      
+
       try {
         const metadata = await this.fetchMetadata(video.youtubeVideoId);
         if (!metadata || !metadata.contentDetails || !metadata.status) continue;
@@ -268,13 +280,17 @@ export class VideosService {
           video.status = VideoStatus.REJECTED;
           video.rejectReason = `YouTube xử lý thất bại hoặc từ chối: ${metadata.status?.rejectionReason || uploadStatus}`;
           await this.videosRepository.save(video);
-          this.logger.log(`Video #${video.id} bị REJECTED vì YouTube uploadStatus: ${uploadStatus}`);
+          this.logger.log(
+            `Video #${video.id} bị REJECTED vì YouTube uploadStatus: ${uploadStatus}`,
+          );
           continue;
         }
 
-        const durationSecs = YoutubeUtils.parseDurationToSeconds(metadata.contentDetails.duration);
+        const durationSecs = YoutubeUtils.parseDurationToSeconds(
+          metadata.contentDetails.duration,
+        );
         const definition = metadata.contentDetails.definition; // 'hd' or 'sd'
-        
+
         video.durationSecs = durationSecs;
         video.definition = definition ?? null;
 
@@ -285,24 +301,33 @@ export class VideosService {
         } else if (definition === 'hd') {
           video.status = VideoStatus.PENDING_REVIEW;
         } else {
-          // Nếu định dạng SD, hệ thống đợi tối đa 30 phút. 
+          // Nếu định dạng SD, hệ thống đợi tối đa 30 phút.
           // (Lưu ý: trên Test có thể sửa số 30 thành ngắn hơn)
-          const diffMinutes = (Date.now() - video.uploadedAt.getTime()) / (1000 * 60);
+          const diffMinutes =
+            (Date.now() - video.uploadedAt.getTime()) / (1000 * 60);
           if (diffMinutes > 30) {
             video.status = VideoStatus.REJECTED;
-            video.rejectReason = 'Video bị từ chối do vi phạm quy định chất lượng: Video chưa đạt phân giải HD sau 30 phút xử lý.';
+            video.rejectReason =
+              'Video bị từ chối do vi phạm quy định chất lượng: Video chưa đạt phân giải HD sau 30 phút xử lý.';
           } else {
             // Chưa đủ 30p, vẫn giữ PROCESSING để đợi
-            this.logger.log(`Video #${video.id} đang xử lý định dạng (đang SD, đã đợi ${Math.round(diffMinutes)} phút)`);
+            this.logger.log(
+              `Video #${video.id} đang xử lý định dạng (đang SD, đã đợi ${Math.round(diffMinutes)} phút)`,
+            );
           }
         }
 
         await this.videosRepository.save(video);
         if (video.status !== VideoStatus.PROCESSING) {
-          this.logger.log(`Video #${video.id} hoàn tất Auto-Validation: chuyển sang ${video.status}`);
+          this.logger.log(
+            `Video #${video.id} hoàn tất Auto-Validation: chuyển sang ${video.status}`,
+          );
         }
       } catch (err: any) {
-        this.logger.error(`Lỗi Auto-Validation cho Video #${video.id}:`, err.message);
+        this.logger.error(
+          `Lỗi Auto-Validation cho Video #${video.id}:`,
+          err.message,
+        );
       }
     }
   }

@@ -17,7 +17,10 @@ export class QuestionBankOption {
   @Column({ name: 'question_id' })
   questionId: number;
 
-  @ManyToOne(() => QuestionBankQuestion, (question) => question.options, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => QuestionBankQuestion, (question) => question.options, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'question_id' })
   question: QuestionBankQuestion;
 

@@ -18,16 +18,16 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     const request = context.switchToHttp().getRequest();
     const clerkUserId = request.clerkUserId;
 
     if (!clerkUserId) {
-      return false; 
+      return false;
     }
 
     const user = await this.userRepo.findOne({
@@ -36,17 +36,21 @@ export class RolesGuard implements CanActivate {
     });
 
     if (!user) {
-      throw new ForbiddenException('Tài khoản không tồn tại, có thể đang đồng bộ webhooks.');
+      throw new ForbiddenException(
+        'Tài khoản không tồn tại, có thể đang đồng bộ webhooks.',
+      );
     }
 
-    request.user = user; 
+    request.user = user;
 
     if (!requiredRoles || requiredRoles.length === 0) {
-      return true; 
+      return true;
     }
 
     if (!requiredRoles.includes(user.role.roleName)) {
-      throw new ForbiddenException(`Giới hạn quyền truy cập. Yêu cầu: ${requiredRoles.join(', ')}`);
+      throw new ForbiddenException(
+        `Giới hạn quyền truy cập. Yêu cầu: ${requiredRoles.join(', ')}`,
+      );
     }
 
     return true;

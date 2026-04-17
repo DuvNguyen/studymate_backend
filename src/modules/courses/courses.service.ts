@@ -1,7 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Course, CourseStatus } from '../../database/entities/course.entity';
+import { Course, CourseStatus, CourseLevel } from '../../database/entities/course.entity';
 import { Category } from '../../database/entities/category.entity';
 import { CourseQueryDto } from './dto/course-query.dto';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -30,7 +34,10 @@ export class CoursesService {
    * Map Course entity sang CourseResponseDto.
    * Instructor fullName lấy từ profile.full_name (nullable).
    */
-  private toDto(course: Course): CourseResponseDto {
+  private toDto(
+    course: Course,
+    showAllVideos: boolean = false,
+  ): CourseResponseDto {
     const dto = new CourseResponseDto();
 
     dto.id = course.id;
@@ -39,7 +46,9 @@ export class CoursesService {
     dto.description = course.description ?? null;
     dto.thumbnailUrl = course.thumbnailUrl ?? null;
     dto.price = Number(course.price);
-    dto.originalPrice = course.originalPrice ? Number(course.originalPrice) : null;
+    dto.originalPrice = course.originalPrice
+      ? Number(course.originalPrice)
+      : null;
     dto.language = course.language;
     dto.level = course.level;
     dto.status = course.status;
@@ -54,7 +63,7 @@ export class CoursesService {
 
     const instructor = new CourseInstructorDto();
     instructor.id = course.instructor?.id;
-    instructor.fullName = (course.instructor as any)?.profile?.fullName ?? null;
+    instructor.fullName = course.instructor?.profile?.fullName ?? null;
     instructor.avatarUrl = course.instructor?.avatarUrl ?? null;
     dto.instructor = instructor;
 
@@ -72,7 +81,7 @@ export class CoursesService {
           sectionDto.id = s.id;
           sectionDto.title = s.title;
           sectionDto.position = s.position;
-          
+
           if (s.lessons) {
             sectionDto.lessons = s.lessons
               .sort((a, b) => a.position - b.position)
@@ -83,13 +92,18 @@ export class CoursesService {
                 lessonDto.durationSecs = l.durationSecs;
                 lessonDto.isPreview = l.isPreview;
                 lessonDto.position = l.position;
-                lessonDto.youtubeVideoId = l.isPreview && l.video ? l.video.youtubeVideoId : null;
+                lessonDto.content = l.content;
+                // Show video ID if it's a preview OR if we are in authorized Learn mode
+                lessonDto.youtubeVideoId =
+                  (showAllVideos || l.isPreview) && l.video
+                    ? l.video.youtubeVideoId
+                    : null;
                 return lessonDto;
               });
           } else {
             sectionDto.lessons = [];
           }
-          
+
           return sectionDto;
         });
     } else {
@@ -161,8 +175,10 @@ export class CoursesService {
     const sortOrder = query.sortOrder || 'DESC';
 
     if (sortBy === 'publishedAt') {
-      qb.orderBy('course.publishedAt', sortOrder)
-        .addOrderBy('course.createdAt', sortOrder);
+      qb.orderBy('course.publishedAt', sortOrder).addOrderBy(
+        'course.createdAt',
+        sortOrder,
+      );
     } else {
       qb.orderBy(`course.${sortBy}`, sortOrder);
       // Secondary sort for stability
@@ -192,19 +208,70 @@ export class CoursesService {
   async findBySlug(slug: string): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({
       where: { slug, status: CourseStatus.PUBLISHED },
-      relations: ['instructor', 'instructor.profile', 'category', 'sections', 'sections.lessons', 'sections.lessons.video'],
+      relations: [
+        'instructor',
+        'instructor.profile',
+        'category',
+        'sections',
+        'sections.lessons',
+        'sections.lessons.video',
+      ],
     });
 
     if (!course) {
       throw new NotFoundException(`Course "${slug}" không tồn tại`);
     }
 
-    return this.toDto(course);
+    return this.toDto(course, false);
+  }
+
+  /**
+   * Lấy chi tiết học tập cho học viên đã đăng ký.
+   * Yêu cầu enrollment active.
+   */
+  async findCourseForLearn(
+    userId: number,
+    slug: string,
+  ): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({
+      where: { slug, status: CourseStatus.PUBLISHED },
+      relations: [
+        'instructor',
+        'instructor.profile',
+        'category',
+        'sections',
+        'sections.lessons',
+        'sections.lessons.video',
+      ],
+    });
+
+    if (!course) {
+      throw new NotFoundException(`Course "${slug}" không tồn tại`);
+    }
+
+    // Verify enrollment
+    const isEnrolled = await this.coursesRepository.manager.findOne(
+      'Enrollment',
+      {
+        where: { student_id: userId, course_id: course.id, is_active: true },
+      },
+    );
+
+    if (!isEnrolled) {
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập học liệu của khóa học này',
+      );
+    }
+
+    return this.toDto(course, true);
   }
 
   // ── Instructor Methods ──────────────────────────────────────────
 
-  async findByInstructor(instructorId: number, query?: CourseQueryDto): Promise<PaginatedCoursesDto> {
+  async findByInstructor(
+    instructorId: number,
+    query?: CourseQueryDto,
+  ): Promise<PaginatedCoursesDto> {
     const page = query?.page ?? 1;
     const limit = query?.limit ?? 12;
     const skip = (page - 1) * limit;
@@ -232,7 +299,7 @@ export class CoursesService {
         qb.andWhere('1=0');
       }
     }
-    
+
     // Quick handle status if provided. Note course-query has categorySlug.
     if (query?.categorySlug) {
       const cat = await this.categoriesRepository.findOne({
@@ -253,13 +320,17 @@ export class CoursesService {
     }
 
     // Default exclude archived unless explicitly requested or getting all
-    if (!query?.status || (query.status !== 'ALL' && query.status !== CourseStatus.ARCHIVED)) {
-      qb.andWhere('course.status != :archivedStatus', { archivedStatus: CourseStatus.ARCHIVED });
+    if (
+      !query?.status ||
+      (query.status !== 'ALL' &&
+        (query.status as any) !== CourseStatus.ARCHIVED)
+    ) {
+      qb.andWhere('course.status != :archivedStatus', {
+        archivedStatus: CourseStatus.ARCHIVED,
+      });
     }
 
-    qb.orderBy('course.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit);
+    qb.orderBy('course.createdAt', 'DESC').skip(skip).take(limit);
 
     const [courses, total] = await qb.getManyAndCount();
 
@@ -273,28 +344,49 @@ export class CoursesService {
     const result = new PaginatedCoursesDto();
     result.data = courses.map((c) => this.toDto(c));
     result.meta = meta;
+
     return result;
   }
 
   async softDeleteCourse(instructorId: number, id: number): Promise<void> {
-    const course = await this.coursesRepository.findOne({ where: { id, instructorId } });
+    const course = await this.coursesRepository.findOne({
+      where: { id, instructorId },
+    });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
-    
+
     course.status = CourseStatus.ARCHIVED;
     await this.coursesRepository.save(course);
   }
 
-  async findInstructorCourseDetail(instructorId: number, id: number): Promise<CourseResponseDto> {
+  async findInstructorCourseDetail(
+    instructorId: number,
+    id: number,
+  ): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({
       where: { id, instructorId },
-      relations: ['category', 'previewVideo', 'sections', 'sections.lessons', 'sections.lessons.video'],
+      relations: [
+        'category',
+        'previewVideo',
+        'sections',
+        'sections.lessons',
+        'sections.lessons.video',
+      ],
     });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
     return this.toDto(course);
   }
 
-  async createCourse(instructorId: number, dto: CreateCourseDto): Promise<CourseResponseDto> {
-    const slug = dto.title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '') + '-' + Date.now();
+  async createCourse(
+    instructorId: number,
+    dto: CreateCourseDto,
+  ): Promise<CourseResponseDto> {
+    const slug =
+      dto.title
+        .toLowerCase()
+        .replace(/ /g, '-')
+        .replace(/[^\w-]/g, '') +
+      '-' +
+      Date.now();
     const course = this.coursesRepository.create({
       title: dto.title,
       slug,
@@ -308,20 +400,34 @@ export class CoursesService {
     return this.toDto(saved);
   }
 
-  async updateCourse(instructorId: number, id: number, dto: UpdateCourseDto): Promise<CourseResponseDto> {
-    const course = await this.coursesRepository.findOne({ where: { id, instructorId } });
+  async updateCourse(
+    instructorId: number,
+    id: number,
+    dto: UpdateCourseDto,
+  ): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({
+      where: { id, instructorId },
+    });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
-    
+
     Object.assign(course, dto);
     const saved = await this.coursesRepository.save(course);
     return this.toDto(saved);
   }
 
-  async submitCourseForReview(instructorId: number, id: number): Promise<CourseResponseDto> {
-    const course = await this.coursesRepository.findOne({ where: { id, instructorId } });
+  async submitCourseForReview(
+    instructorId: number,
+    id: number,
+  ): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({
+      where: { id, instructorId },
+    });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
-    
-    if (course.status === CourseStatus.PENDING_REVIEW || course.status === CourseStatus.PUBLISHED) {
+
+    if (
+      course.status === (CourseStatus.PENDING_REVIEW as CourseStatus) ||
+      course.status === (CourseStatus.PUBLISHED as CourseStatus)
+    ) {
       throw new Error('Khóa học không ở trạng thái hợp lệ để gửi duyệt');
     }
 
@@ -390,10 +496,10 @@ export class CoursesService {
     return result;
   }
 
-  async approveCourse(id: number, adminId: number): Promise<CourseResponseDto> {
+  async approveCourse(id: number): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({ where: { id } });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
-    
+
     if (course.status !== CourseStatus.PENDING_REVIEW) {
       throw new Error('Khóa học không ở trạng thái chờ duyệt');
     }
@@ -401,33 +507,39 @@ export class CoursesService {
     course.status = CourseStatus.PUBLISHED;
     course.publishedAt = new Date();
     course.rejectionReason = null;
-    
+
     const saved = await this.coursesRepository.save(course);
     return this.toDto(saved);
   }
 
-  async rejectCourse(id: number, adminId: number, dto: RejectCourseDto): Promise<CourseResponseDto> {
+  async rejectCourse(
+    id: number,
+    dto: RejectCourseDto,
+  ): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({ where: { id } });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
-    
+
     if (course.status !== CourseStatus.PENDING_REVIEW) {
       throw new Error('Khóa học không ở trạng thái chờ duyệt');
     }
 
     course.status = CourseStatus.REJECTED;
     course.rejectionReason = dto.reason;
-    
+
     const saved = await this.coursesRepository.save(course);
     return this.toDto(saved);
   }
 
-  async suspendCourse(id: number, adminId: number, dto: RejectCourseDto): Promise<CourseResponseDto> {
+  async suspendCourse(
+    id: number,
+    dto: RejectCourseDto,
+  ): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({ where: { id } });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
-    
-    course.status = CourseStatus.REJECTED;
+
+    course.status = CourseStatus.REJECTED; // Or a SUSPENDED status if it existed
     course.rejectionReason = dto.reason;
-    
+
     const saved = await this.coursesRepository.save(course);
     return this.toDto(saved);
   }

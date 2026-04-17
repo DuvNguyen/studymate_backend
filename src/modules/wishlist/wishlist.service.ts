@@ -1,9 +1,16 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wishlist } from '../../database/entities/wishlist.entity';
 import { Course } from '../../database/entities/course.entity';
-import { WishlistResponseDto, WishlistCheckResponseDto } from './dto/wishlist-response.dto';
+import {
+  WishlistResponseDto,
+  WishlistCheckResponseDto,
+} from './dto/wishlist-response.dto';
 import { plainToInstance } from 'class-transformer';
 
 @Injectable()
@@ -18,7 +25,12 @@ export class WishlistService {
   async findAll(studentId: number): Promise<WishlistResponseDto[]> {
     const items = await this.wishlistRepository.find({
       where: { studentId },
-      relations: ['course', 'course.instructor', 'course.instructor.profile', 'course.category'],
+      relations: [
+        'course',
+        'course.instructor',
+        'course.instructor.profile',
+        'course.category',
+      ],
       order: { addedAt: 'DESC' },
     });
 
@@ -51,7 +63,8 @@ export class WishlistService {
       where: { studentId, courseId },
     });
 
-    const shouldRemove = forceStatus === false || (forceStatus === undefined && existing);
+    const shouldRemove =
+      forceStatus === false || (forceStatus === undefined && existing);
 
     if (shouldRemove) {
       if (existing) await this.wishlistRepository.remove(existing);
@@ -65,7 +78,10 @@ export class WishlistService {
     }
   }
 
-  async checkWishlist(studentId: number, courseId: number): Promise<WishlistCheckResponseDto> {
+  async checkWishlist(
+    studentId: number,
+    courseId: number,
+  ): Promise<WishlistCheckResponseDto> {
     const existing = await this.wishlistRepository.findOne({
       where: { studentId, courseId },
     });

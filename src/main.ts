@@ -27,8 +27,8 @@ async function bootstrap() {
   // Validation tự động cho DTO
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,      // tự loại bỏ field không khai báo trong DTO
-      transform: true,      // tự convert kiểu dữ liệu
+      whitelist: true, // tự loại bỏ field không khai báo trong DTO
+      transform: true, // tự convert kiểu dữ liệu
       forbidNonWhitelisted: true,
     }),
   );

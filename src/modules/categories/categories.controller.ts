@@ -20,9 +20,7 @@ export class CategoriesController {
    * Public — lấy category cụ thể theo slug, kèm children.
    */
   @Get(':slug')
-  async findBySlug(
-    @Param('slug') slug: string,
-  ): Promise<CategoryResponseDto> {
+  async findBySlug(@Param('slug') slug: string): Promise<CategoryResponseDto> {
     return this.categoriesService.findBySlug(slug);
   }
 }
