@@ -1,5 +1,31 @@
 import { Expose, Type, Transform } from 'class-transformer';
 
+export class QuizDto {
+  @Expose()
+  id: number;
+
+  @Expose()
+  title: string;
+
+  @Expose()
+  description: string | null;
+
+  @Expose()
+  passingScore: number;
+
+  @Expose()
+  timeLimit: number;
+
+  @Expose()
+  numQuestions: number;
+
+  @Expose()
+  isFinal: boolean;
+
+  @Expose()
+  sectionId: number | null;
+}
+
 export class LessonDto {
   @Expose()
   id: number;
@@ -36,6 +62,10 @@ export class SectionDto {
   @Expose()
   @Type(() => LessonDto)
   lessons: LessonDto[];
+
+  @Expose()
+  @Type(() => QuizDto)
+  quiz: QuizDto | null;
 }
 
 export class CourseInstructorDto {
@@ -132,6 +162,10 @@ export class CourseResponseDto {
 
   @Expose()
   previewVideo: any;
+
+  @Expose()
+  @Type(() => QuizDto)
+  finalQuiz: QuizDto | null;
 }
 
 export class PaginationMetaDto {

@@ -58,6 +58,9 @@ export class AuthService {
       role: user.role.roleName,
       status: user.status,
       kycStatus: user.instructorProfile?.kycStatus || null,
+      bankName: user.instructorProfile?.bankName || null,
+      bankAccountNumber: user.instructorProfile?.bankAccountNumber || null,
+      bankAccountName: user.instructorProfile?.bankAccountName || null,
       createdAt: user.createdAt,
     };
   }
