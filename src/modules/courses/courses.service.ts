@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Course, CourseStatus, CourseLevel } from '../../database/entities/course.entity';
 import { Category } from '../../database/entities/category.entity';
+import { Quiz } from '../../database/entities/quiz.entity';
 import { CourseQueryDto } from './dto/course-query.dto';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -28,6 +29,8 @@ export class CoursesService {
     private readonly coursesRepository: Repository<Course>,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
+    @InjectRepository(Quiz)
+    private readonly quizRepository: Repository<Quiz>,
   ) {}
 
   /**
@@ -111,6 +114,15 @@ export class CoursesService {
     }
 
     dto.previewVideo = course.previewVideo ?? null;
+
+    if ((course as any).quizzes) {
+      const allQuizzes = (course as any).quizzes as Quiz[];
+      dto.finalQuiz = allQuizzes.find(q => q.isFinal) || null;
+      
+      dto.sections.forEach(s => {
+        s.quiz = allQuizzes.find(q => q.sectionId === s.id && !q.isFinal) || null;
+      });
+    }
 
     return dto;
   }
@@ -215,6 +227,7 @@ export class CoursesService {
         'sections',
         'sections.lessons',
         'sections.lessons.video',
+        'quizzes',
       ],
     });
 
@@ -242,6 +255,7 @@ export class CoursesService {
         'sections',
         'sections.lessons',
         'sections.lessons.video',
+        'quizzes',
       ],
     });
 
@@ -370,6 +384,7 @@ export class CoursesService {
         'sections',
         'sections.lessons',
         'sections.lessons.video',
+        'quizzes',
       ],
     });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');

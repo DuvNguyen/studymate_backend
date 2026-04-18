@@ -24,6 +24,8 @@ import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { DiscussionsModule } from './modules/discussions/discussions.module';
 import { LessonProgressModule } from './modules/lesson-progress/lesson-progress.module';
+import { WalletsModule } from './modules/wallets/wallets.module';
+import { QuizzesModule } from './modules/quizzes/quizzes.module';
 
 @Module({
   imports: [
@@ -59,6 +61,8 @@ import { LessonProgressModule } from './modules/lesson-progress/lesson-progress.
     WishlistModule,
     DiscussionsModule,
     LessonProgressModule,
+    WalletsModule,
+    QuizzesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
