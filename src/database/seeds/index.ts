@@ -26,6 +26,9 @@ import { Transaction } from '../entities/transaction.entity';
 import { LessonProgress } from '../entities/lesson-progress.entity';
 import { LessonDiscussion } from '../entities/lesson-discussion.entity';
 import { Wishlist } from '../entities/wishlist.entity';
+import { Quiz } from '../entities/quiz.entity';
+import { QuizAttempt } from '../entities/quiz-attempt.entity';
+import { Payout } from '../entities/payout.entity';
 
 import { seedRoles } from './01-roles.seed';
 import { seedUsers } from './02-users.seed';
@@ -64,6 +67,9 @@ const dataSource = new DataSource({
     LessonProgress,
     LessonDiscussion,
     Wishlist,
+    Quiz,
+    QuizAttempt,
+    Payout,
   ],
   synchronize: false, // Tắt synchronize để tránh lỗi drop/alter table
 });

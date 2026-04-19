@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Param, UseGuards, Body } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -11,8 +11,11 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post('checkout')
-  checkout(@CurrentUser() user: User) {
-    return this.ordersService.checkoutParams(user);
+  checkout(
+    @CurrentUser() user: User,
+    @Body('couponCode') couponCode?: string,
+  ) {
+    return this.ordersService.checkoutParams(user, couponCode);
   }
 
   @Get(':id')

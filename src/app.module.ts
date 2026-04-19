@@ -26,6 +26,10 @@ import { DiscussionsModule } from './modules/discussions/discussions.module';
 import { LessonProgressModule } from './modules/lesson-progress/lesson-progress.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
 import { QuizzesModule } from './modules/quizzes/quizzes.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { RefundsModule } from './modules/refunds/refunds.module';
 
 @Module({
   imports: [
@@ -63,6 +67,10 @@ import { QuizzesModule } from './modules/quizzes/quizzes.module';
     LessonProgressModule,
     WalletsModule,
     QuizzesModule,
+    CouponsModule,
+    NotificationsModule,
+    ReviewsModule,
+    RefundsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -11,6 +11,7 @@ import { StaffProfile } from '../../database/entities/staff-profile.entity';
 import { InstructorDocument } from '../../database/entities/instructor-document.entity';
 import { PublicUsersController } from './public-users.controller';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -21,7 +22,7 @@ import { PublicUsersController } from './public-users.controller';
       StaffProfile,
       InstructorDocument,
     ]),
-    AuthModule, // tái dùng ClerkAuthGuard
+    AuthModule, 
   ],
   controllers: [UsersController, PublicUsersController],
   providers: [UsersService],

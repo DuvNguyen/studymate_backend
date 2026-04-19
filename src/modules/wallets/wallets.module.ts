@@ -7,8 +7,13 @@ import { Transaction } from '../../database/entities/transaction.entity';
 import { Payout } from '../../database/entities/payout.entity';
 import { User } from '../../database/entities/user.entity';
 
+import { UsersModule } from '../users/users.module';
+
 @Module({
-  imports: [TypeOrmModule.forFeature([Wallet, Transaction, Payout, User])],
+  imports: [
+    TypeOrmModule.forFeature([Wallet, Transaction, Payout, User]),
+    UsersModule,
+  ],
   controllers: [WalletsController],
   providers: [WalletsService],
   exports: [WalletsService],

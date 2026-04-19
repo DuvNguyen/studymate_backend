@@ -25,6 +25,8 @@ import {
   UpdateUserRoleDto,
 } from './dto/update-user-admin.dto';
 import { createClerkClient } from '@clerk/backend';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 
 export interface PaginationMeta {
   total: number;
@@ -53,7 +55,15 @@ export class UsersService {
     private instructorDocumentRepo: Repository<InstructorDocument>,
     @InjectRepository(StaffProfile)
     private staffProfileRepo: Repository<StaffProfile>,
+    private notificationsService: NotificationsService,
   ) {}
+
+  async findOneByClerkId(clerkUserId: string): Promise<User | null> {
+    return this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['role'],
+    });
+  }
 
   // ─── Profile (bản thân) ────────────────────────────────────────────────────
 
@@ -313,6 +323,25 @@ export class UsersService {
       }
     }
 
+    // Send KYC notification
+    if (status === KycStatus.APPROVED) {
+      await this.notificationsService.sendNotification(
+        targetId,
+        NotificationType.KYC,
+        'Hồ sơ đã được xác minh!',
+        'Hồ sơ giảng viên của bạn đã được xác minh thành công. Bạn đã có thể thực hiện rút tiền.',
+        { kycStatus: 'APPROVED' },
+      );
+    } else if (status === KycStatus.REJECTED && user.role?.roleName !== 'USER') {
+      await this.notificationsService.sendNotification(
+        targetId,
+        NotificationType.KYC,
+        'Hồ sơ cần chỉnh sửa',
+        `Hồ sơ giảng viên cần chỉnh sửa thêm. Lý do: ${reason || 'Không rõ'}`,
+        { kycStatus: 'REJECTED', reason },
+      );
+    }
+
     return this.toPublicProfile(user);
   }
 
@@ -487,7 +516,7 @@ export class UsersService {
 
     return {
       id: user.id,
-      fullName: user.profile?.fullName ?? 'Giảng viên StudyMate',
+      fullName: user.profile?.fullName || user.email || 'Giảng viên StudyMate',
       avatarUrl: user.avatarUrl,
       bio: user.profile?.bio ?? 'Chưa có thông tin giới thiệu.',
       certificates: user.instructorProfile?.certificates || [],
@@ -559,7 +588,7 @@ export class UsersService {
       email: user.email,
       firstName: fName,
       lastName: lName,
-      fullName: user.profile?.fullName ?? null,
+      fullName: user.profile?.fullName || user.email || null,
       bio: user.profile?.bio ?? null,
       avatarUrl: user.avatarUrl ?? null,
       role: user.role?.roleName ?? null,

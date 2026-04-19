@@ -6,6 +6,8 @@ import { QuizAttempt } from '../../database/entities/quiz-attempt.entity';
 import { QuestionBankQuestion } from '../../database/entities/question-bank-question.entity';
 import { QuestionBank } from '../../database/entities/question-bank.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 
 @Injectable()
 export class QuizzesService {
@@ -20,6 +22,7 @@ export class QuizzesService {
     private questionRepository: Repository<QuestionBankQuestion>,
     @InjectRepository(Enrollment)
     private enrollmentRepository: Repository<Enrollment>,
+    private notificationsService: NotificationsService,
   ) {}
 
   async getQuizzesByCourse(courseId: number) {
@@ -146,11 +149,61 @@ export class QuizzesService {
        await this.markCourseCompleted(quiz.courseId, userId);
     }
 
+    // Send quiz notifications in the background
+    this.sendQuizNotifications(quiz, userId, scorePercent, isPassed, correctCount, totalCount);
+
     return {
       ...saved,
       correctCount,
       totalCount,
     };
+  }
+
+  private async sendQuizNotifications(
+    quiz: Quiz,
+    userId: number,
+    scorePercent: number,
+    isPassed: boolean,
+    correctCount: number,
+    totalCount: number,
+  ) {
+    try {
+      const quizTitle = quiz.title || 'Bài kiểm tra';
+
+      if (isPassed) {
+        await this.notificationsService.sendNotification(
+          userId,
+          NotificationType.QUIZ,
+          'Chúc mừng! Vượt qua bài kiểm tra!',
+          `Bạn đã đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%) trong bài kiểm tra "${quizTitle}".${quiz.isFinal ? ' Bạn đã đủ điều kiện hoàn thành khóa học!' : ''}`,
+          { quizId: quiz.id, score: scorePercent },
+        );
+      } else {
+        await this.notificationsService.sendNotification(
+          userId,
+          NotificationType.QUIZ,
+          'Kết quả bài kiểm tra',
+          `Rất tiếc, bạn chỉ đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%). Hãy ôn tập lại và thử lại nhé!`,
+          { quizId: quiz.id, score: scorePercent },
+        );
+      }
+
+      // If final exam passed, send course completion notification
+      if (quiz.isFinal && isPassed) {
+        const course = quiz.course;
+        if (course) {
+          await this.notificationsService.sendNotification(
+            userId,
+            NotificationType.ENROLLMENT,
+            'Hoàn thành khóa học!',
+            `Tuyệt vời! Bạn đã hoàn thành khóa học "${course.title}". Chứng chỉ của bạn đã sẵn sàng!`,
+            { courseId: quiz.courseId },
+          );
+        }
+      }
+    } catch (e) {
+      console.error('Failed to send quiz notification:', e);
+    }
   }
 
   private async markCourseCompleted(courseId: number, userId: number) {

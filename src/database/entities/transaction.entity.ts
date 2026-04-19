@@ -37,6 +37,14 @@ export class Transaction {
   @Column()
   status: string; // LOCKED, AVAILABLE, RELEASED, CANCELLED
 
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'balance_after',
+  })
+  balance_after: number;
+
   @Column({ type: 'timestamp', nullable: true, name: 'locked_until' })
   locked_until: Date;
 

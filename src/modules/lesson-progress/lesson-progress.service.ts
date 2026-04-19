@@ -10,6 +10,9 @@ import { Enrollment } from '../../database/entities/enrollment.entity';
 import { Lesson } from '../../database/entities/lesson.entity';
 import { User } from '../../database/entities/user.entity';
 import { UpsertProgressDto } from './dto/upsert-progress-request.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
+import { Course } from '../../database/entities/course.entity';
 
 @Injectable()
 export class LessonProgressService {
@@ -20,6 +23,7 @@ export class LessonProgressService {
     private readonly enrollmentsRepo: Repository<Enrollment>,
     @InjectRepository(Lesson)
     private readonly lessonsRepo: Repository<Lesson>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async upsertProgress(user: User, dto: UpsertProgressDto) {
@@ -105,5 +109,25 @@ export class LessonProgressService {
     enrollment.completed_at = percent === 100 ? new Date() : null;
 
     await this.enrollmentsRepo.save(enrollment);
+
+    // Notify on 100% completion
+    if (percent === 100 && !enrollment.completed_at) {
+      try {
+        const course = await this.lessonsRepo.manager.findOne(Course, {
+          where: { id: courseId },
+        });
+        if (course) {
+          await this.notificationsService.sendNotification(
+            enrollment.student_id,
+            NotificationType.ENROLLMENT,
+            'Hoàn thành 100% khóa học!',
+            `Tuyệt vời! Bạn đã hoàn thành 100% khóa học "${course.title}".`,
+            { courseId, enrollmentId },
+          );
+        }
+      } catch (e) {
+        console.error('Failed to send completion notification:', e);
+      }
+    }
   }
 }
