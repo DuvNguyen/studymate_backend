@@ -11,6 +11,8 @@ import { Transaction } from '../../database/entities/transaction.entity';
 
 import { User } from '../../database/entities/user.entity';
 
+import { CouponsModule } from '../coupons/coupons.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -22,6 +24,7 @@ import { User } from '../../database/entities/user.entity';
       Transaction,
       User,
     ]),
+    CouponsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

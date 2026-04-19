@@ -128,15 +128,25 @@ export class ClerkWebhookController {
       );
     }
 
-    // Xử lý sự kiện user.updated (sync email, avatar)
+    // Xử lý sự kiện user.updated (sync email, avatar, name)
     if (payload.type === 'user.updated') {
-      const { id: clerkUserId, email_addresses, image_url } = payload.data;
+      const { id: clerkUserId, email_addresses, image_url, first_name, last_name } = payload.data;
       const email = email_addresses?.[0]?.email_address;
+      const fullName = `${first_name || ''} ${last_name || ''}`.trim();
 
       await this.userRepo.update(
         { clerkUserId },
         { email, avatarUrl: image_url || null },
       );
+
+      // Đồng bộ vào Profile
+      const user = await this.userRepo.findOne({ where: { clerkUserId } });
+      if (user) {
+        await this.profileRepo.upsert(
+          { userId: user.id, fullName: fullName || undefined },
+          ['userId'],
+        );
+      }
     }
 
     // Xử lý sự kiện user.deleted

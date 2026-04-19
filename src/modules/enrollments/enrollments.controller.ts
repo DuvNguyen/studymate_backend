@@ -26,6 +26,13 @@ export class EnrollmentsController {
     return this.enrollmentsService.findMyCourses(user);
   }
 
+  @Get('my-purchases')
+  async getMyPurchases(
+    @CurrentUser() user: User,
+  ): Promise<EnrollmentResponseDto[]> {
+    return this.enrollmentsService.findMyPurchases(user);
+  }
+
   @Post('direct')
   @Roles('ADMIN', 'STAFF')
   async directEnroll(

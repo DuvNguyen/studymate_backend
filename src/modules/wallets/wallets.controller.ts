@@ -88,10 +88,27 @@ export class WalletsController {
     return this.walletsService.reconcilePayouts(csvContent);
   }
 
-  // Temporary endpoint to trigger cron manually for testing
   @Post('trigger-release')
   @Roles('ADMIN')
   triggerRelease() {
     return this.walletsService.releaseLockedTransactions();
+  }
+
+  @Get('ledger')
+  @Roles('ADMIN', 'STAFF')
+  getLedger(
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.walletsService.getMasterLedger({
+      status,
+      type,
+      search,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+    });
   }
 }

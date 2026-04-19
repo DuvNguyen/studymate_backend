@@ -30,24 +30,39 @@ export class EnrollmentsService {
         `[EnrollmentsService] Found ${enrollments.length} enrollments`,
       );
 
-      return enrollments.map((e) => {
-        const data = {
-          ...e,
-          course: {
-            ...e.course,
-            instructor_name: e.course.instructor?.profile
-              ? e.course.instructor.profile.fullName
-              : 'Instructor',
-          },
-        };
-        return plainToInstance(EnrollmentResponseDto, data, {
-          excludeExtraneousValues: true,
-        });
-      });
+      return enrollments.map((e) => this.mapToDto(e));
     } catch (error: any) {
       console.error(`[EnrollmentsService] Error fetching courses:`, error);
       throw error;
     }
+  }
+
+  async findMyPurchases(user: User): Promise<EnrollmentResponseDto[]> {
+    try {
+      const enrollments = await this.enrollmentsRepo.find({
+        where: { student_id: user.id },
+        relations: ['course', 'course.instructor', 'course.instructor.profile', 'order_item'],
+        order: { enrolled_at: 'DESC' },
+      });
+
+      return enrollments.map((e) => this.mapToDto(e));
+    } catch (error: any) {
+      console.error(`[EnrollmentsService] Error fetching purchases:`, error);
+      throw error;
+    }
+  }
+
+  private mapToDto(e: Enrollment): EnrollmentResponseDto {
+    const data = {
+      ...e,
+      course: {
+        ...e.course,
+        instructor_name: e.course.instructor?.profile?.fullName || e.course.instructor?.email || 'Instructor',
+      },
+    };
+    return plainToInstance(EnrollmentResponseDto, data, {
+      excludeExtraneousValues: true,
+    });
   }
 
   async directEnroll(
@@ -87,7 +102,7 @@ export class EnrollmentsService {
       ...saved,
       course: {
         ...course,
-        instructor_name: course.instructor?.profile?.fullName || 'Instructor',
+        instructor_name: course.instructor?.profile?.fullName || course.instructor?.email || 'Instructor',
       },
     };
     return plainToInstance(EnrollmentResponseDto, data, {

@@ -17,6 +17,14 @@ export class CourseShortResponseDto {
   slug: string;
 }
 
+export class OrderItemShortDto {
+  @Expose()
+  id: number;
+
+  @Expose()
+  final_price: number;
+}
+
 export class EnrollmentResponseDto {
   @Expose()
   id: number;
@@ -39,4 +47,11 @@ export class EnrollmentResponseDto {
 
   @Expose()
   completed_at: Date;
+
+  @Expose()
+  is_active: boolean;
+
+  @Expose()
+  @Type(() => OrderItemShortDto)
+  order_item: OrderItemShortDto;
 }
