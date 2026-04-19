@@ -108,9 +108,11 @@ export async function seedMasterCourse(dataSource: DataSource) {
 
   for (const data of lessonData) {
     let lesson = await lessonRepo.findOne({ where: { sectionId: data.sectionId, title: data.title } });
-    if (!lesson) {
-      // Tạo Video thực thể
-      const video = await videoRepo.save(
+    
+    // Tìm hoặc tạo Video thực thể
+    let video = await videoRepo.findOne({ where: { youtubeVideoId: data.ytId } });
+    if (!video) {
+      video = await videoRepo.save(
         videoRepo.create({
           uploaderId: instructorId,
           title: data.title,
@@ -121,8 +123,10 @@ export async function seedMasterCourse(dataSource: DataSource) {
           durationSecs: data.duration,
         }),
       );
+    }
 
-      // Tạo Lesson
+    if (!lesson) {
+      // Tạo Lesson mới
       lesson = await lessonRepo.save(
         lessonRepo.create({
           sectionId: data.sectionId,
@@ -133,7 +137,15 @@ export async function seedMasterCourse(dataSource: DataSource) {
           content: `Nội dung chi tiết cho bài học: ${data.title}. Video này hướng dẫn về ${data.title} sử dụng Ubuntu Linux.`,
         }),
       );
-      console.log(`    └─ Tạo bài học: ${lesson.title}`);
+      console.log(`    └─ Tạo bài học mới: ${lesson.title}`);
+    } else {
+      // Cập nhật Lesson cũ nếu thiếu videoId
+      if (lesson.videoId !== video.id) {
+        lesson.videoId = video.id;
+        lesson.durationSecs = data.duration;
+        await lessonRepo.save(lesson);
+        console.log(`    └─ Cập nhật video cho bài học: ${lesson.title}`);
+      }
     }
   }
 
@@ -167,6 +179,7 @@ export async function seedMasterCourse(dataSource: DataSource) {
     lessonCount: finalLessonCount,
     sectionCount: finalSectionCount,
     studentCount: 1,
+    totalDuration: lessonData.reduce((acc, curr) => acc + curr.duration, 0),
   });
 
   console.log('Seed Master Course hoàn thành!');

@@ -5,16 +5,14 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../../database/entities/user.entity';
+import { UsersService } from '../../modules/users/users.service';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    @InjectRepository(User) private userRepo: Repository<User>,
+    private usersService: UsersService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -30,10 +28,7 @@ export class RolesGuard implements CanActivate {
       return false;
     }
 
-    const user = await this.userRepo.findOne({
-      where: { clerkUserId },
-      relations: ['role'],
-    });
+    const user = await this.usersService.findOneByClerkId(clerkUserId);
 
     if (!user) {
       throw new ForbiddenException(

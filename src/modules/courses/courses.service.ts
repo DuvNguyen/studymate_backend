@@ -55,10 +55,29 @@ export class CoursesService {
     dto.language = course.language;
     dto.level = course.level;
     dto.status = course.status;
-    dto.totalDuration = course.totalDuration;
-    dto.lessonCount = course.lessonCount;
-    dto.sectionCount = course.sectionCount;
-    dto.studentCount = course.studentCount;
+    // Calculate stats if not present (helpful for seeds or fresh courses)
+    let calculatedDuration = course.totalDuration || 0;
+    let calculatedLessonCount = course.lessonCount || 0;
+    
+    if (course.sections && (calculatedDuration === 0 || calculatedLessonCount === 0)) {
+        let total = 0;
+        let count = 0;
+        course.sections.forEach(s => {
+            if (s.lessons) {
+                s.lessons.forEach(l => {
+                    total += l.durationSecs || 0;
+                    count++;
+                });
+            }
+        });
+        calculatedDuration = total;
+        calculatedLessonCount = count;
+    }
+
+    dto.totalDuration = calculatedDuration;
+    dto.lessonCount = calculatedLessonCount;
+    dto.sectionCount = course.sectionCount || (course.sections?.length || 0);
+    dto.studentCount = course.studentCount || 0;
     dto.avgRating = Number(course.avgRating);
     dto.reviewCount = course.reviewCount;
     dto.publishedAt = course.publishedAt ?? null;
@@ -218,7 +237,7 @@ export class CoursesService {
    * Lấy chi tiết một course theo slug (public).
    */
   async findBySlug(slug: string): Promise<CourseResponseDto> {
-    const course = await this.coursesRepository.findOne({
+    let course = await this.coursesRepository.findOne({
       where: { slug, status: CourseStatus.PUBLISHED },
       relations: [
         'instructor',
@@ -232,9 +251,21 @@ export class CoursesService {
     });
 
     if (!course) {
-      throw new NotFoundException(`Course "${slug}" không tồn tại`);
+      course = await this.coursesRepository
+        .createQueryBuilder('course')
+        .leftJoinAndSelect('course.instructor', 'instructor')
+        .leftJoinAndSelect('instructor.profile', 'profile')
+        .leftJoinAndSelect('course.category', 'category')
+        .leftJoinAndSelect('course.sections', 'sections')
+        .leftJoinAndSelect('sections.lessons', 'lessons')
+        .leftJoinAndSelect('lessons.video', 'video')
+        .leftJoinAndSelect('course.quizzes', 'quizzes')
+        .where('course.slug LIKE :slug', { slug: `${slug}%` })
+        .andWhere('course.status = :status', { status: CourseStatus.PUBLISHED })
+        .getOne();
     }
 
+    if (!course) throw new NotFoundException(`Course "${slug}" không tồn tại`);
     return this.toDto(course, false);
   }
 
@@ -246,7 +277,7 @@ export class CoursesService {
     userId: number,
     slug: string,
   ): Promise<CourseResponseDto> {
-    const course = await this.coursesRepository.findOne({
+    let course = await this.coursesRepository.findOne({
       where: { slug, status: CourseStatus.PUBLISHED },
       relations: [
         'instructor',
@@ -258,6 +289,21 @@ export class CoursesService {
         'quizzes',
       ],
     });
+
+    if (!course) {
+      course = await this.coursesRepository
+        .createQueryBuilder('course')
+        .leftJoinAndSelect('course.instructor', 'instructor')
+        .leftJoinAndSelect('instructor.profile', 'profile')
+        .leftJoinAndSelect('course.category', 'category')
+        .leftJoinAndSelect('course.sections', 'sections')
+        .leftJoinAndSelect('sections.lessons', 'lessons')
+        .leftJoinAndSelect('lessons.video', 'video')
+        .leftJoinAndSelect('course.quizzes', 'quizzes')
+        .where('course.slug LIKE :slug', { slug: `${slug}%` })
+        .andWhere('course.status = :status', { status: CourseStatus.PUBLISHED })
+        .getOne();
+    }
 
     if (!course) {
       throw new NotFoundException(`Course "${slug}" không tồn tại`);
@@ -388,7 +434,7 @@ export class CoursesService {
       ],
     });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
-    return this.toDto(course);
+    return this.toDto(course, true);
   }
 
   async createCourse(

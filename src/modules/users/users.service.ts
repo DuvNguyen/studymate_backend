@@ -55,6 +55,13 @@ export class UsersService {
     private staffProfileRepo: Repository<StaffProfile>,
   ) {}
 
+  async findOneByClerkId(clerkUserId: string): Promise<User | null> {
+    return this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['role'],
+    });
+  }
+
   // ─── Profile (bản thân) ────────────────────────────────────────────────────
 
   async getProfile(clerkUserId: string) {

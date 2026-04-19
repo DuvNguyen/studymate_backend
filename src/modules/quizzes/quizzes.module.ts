@@ -5,8 +5,10 @@ import { QuizzesController } from './quizzes.controller';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { QuizAttempt } from '../../database/entities/quiz-attempt.entity';
 import { QuestionBankQuestion } from '../../database/entities/question-bank-question.entity';
+import { QuestionBankOption } from '../../database/entities/question-bank-option.entity';
 import { QuestionBank } from '../../database/entities/question-bank.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -15,6 +17,7 @@ import { Enrollment } from '../../database/entities/enrollment.entity';
       QuizAttempt,
       QuestionBank,
       QuestionBankQuestion,
+      QuestionBankOption,
       Enrollment,
     ]),
   ],

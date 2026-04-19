@@ -13,6 +13,7 @@ import { User } from './user.entity';
 import { Category } from './category.entity';
 import { Video } from './video.entity';
 import { Section } from './section.entity';
+import { Quiz } from './quiz.entity';
 
 export enum CourseStatus {
   DRAFT = 'DRAFT',
@@ -64,6 +65,9 @@ export class Course {
 
   @OneToMany(() => Section, (section) => section.course)
   sections: Section[];
+
+  @OneToMany(() => Quiz, (quiz) => quiz.course)
+  quizzes: Quiz[];
 
   @Column({ type: 'varchar', unique: true })
   title: string;

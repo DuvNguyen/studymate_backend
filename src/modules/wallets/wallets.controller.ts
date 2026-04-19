@@ -12,7 +12,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { Multer } from 'multer';
 import { WalletsService } from './wallets.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
