@@ -30,6 +30,7 @@ import { CouponsModule } from './modules/coupons/coupons.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { RefundsModule } from './modules/refunds/refunds.module';
     NotificationsModule,
     ReviewsModule,
     RefundsModule,
+    StatisticsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

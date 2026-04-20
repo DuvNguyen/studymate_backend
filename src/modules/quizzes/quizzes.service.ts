@@ -182,15 +182,34 @@ export class QuizzesService {
     let correctCount = 0;
     const totalCount = snapshots.length;
 
-    snapshots.forEach((s: any) => {
-      const question = questionsWithCorrect.find(q => q.id === s.id);
-      if (!question) return;
+    // The frontend sends { answers: { questionId: [optionId] } }
+    const answersMap = answers?.answers || answers || {};
 
-      const studentAnswer = answers[s.id];
+    snapshots.forEach((s: any) => {
+      const question = questionsWithCorrect.find(q => Number(q.id) === Number(s.id));
+      if (!question) {
+        console.log(`[QuizzesService] Question not found for snapshot id: ${s.id}`);
+        return;
+      }
+
+      const studentAnswer = answersMap[s.id] || answersMap[String(s.id)]; 
       const correctOption = question.options.find(o => o.isCorrect);
 
-      if (correctOption && studentAnswer === correctOption.id) {
-        correctCount++;
+      console.log(`[grading] Q:${s.id} Student:${JSON.stringify(studentAnswer)} Correct:${correctOption?.id}`);
+
+      if (correctOption) {
+        const correctId = Number(correctOption.id);
+        if (Array.isArray(studentAnswer)) {
+          if (studentAnswer.some(id => Number(id) === correctId)) {
+            correctCount++;
+            console.log(`[grading] Correct via array`);
+          }
+        } else if (studentAnswer !== undefined && studentAnswer !== null) {
+          if (Number(studentAnswer) === correctId) {
+            correctCount++;
+            console.log(`[grading] Correct via direct`);
+          }
+        }
       }
     });
 
@@ -222,6 +241,34 @@ export class QuizzesService {
         if (correctOpt) acc[q.id] = correctOpt.id;
         return acc;
       }, {} as Record<number, number>)
+    };
+  }
+
+  async getAttemptDetail(attemptId: number, userId: number) {
+    const attempt = await this.attemptRepository.findOne({
+      where: { id: attemptId, userId },
+      relations: ['quiz'],
+    });
+
+    if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài');
+
+    const snapshots = attempt.questionSnapshots;
+    const questionIds = snapshots.map((s: any) => s.id);
+    
+    const questionsWithCorrect = await this.questionRepository.find({
+      where: { id: In(questionIds) },
+      relations: ['options'],
+    });
+
+    const correctAnswers = questionsWithCorrect.reduce((acc, q) => {
+      const correctOpt = q.options.find(o => o.isCorrect);
+      if (correctOpt) acc[q.id] = correctOpt.id;
+      return acc;
+    }, {} as Record<number, number>);
+
+    return {
+      ...attempt,
+      correctAnswers,
     };
   }
 

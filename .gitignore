@@ -61,3 +61,24 @@ GEMINI.md
 CLAUDE.md
 AGENTS.md
 .gitnexus
+
+# Python virtual environments
+venv/
+env/
+.venv/
+.env/
+*/venv/
+*/env/
+*/.venv/
+
+# Python caches and bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+.mypy_cache/
+.tox/
+.nox/
+.cache/

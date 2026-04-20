@@ -57,6 +57,13 @@ export class QuizzesController {
   ) {
     return this.quizzesService.submitAttempt(attemptId, user.id, answers);
   }
+  @Get('quizzes/attempts/:attemptId')
+  async getAttempt(
+    @CurrentUser() user: User,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+  ) {
+    return this.quizzesService.getAttemptDetail(attemptId, user.id);
+  }
 
   // ── Instructor Endpoints ─────────────────────────────────────
 
