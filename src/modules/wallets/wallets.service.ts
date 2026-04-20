@@ -42,11 +42,13 @@ export class WalletsService {
     return wallet;
   }
 
-  async getTransactionHistory(userId: number) {
+  async getTransactionHistory(userId: number, page: number = 1, limit: number = 10) {
     const wallet = await this.getMyWallet(userId);
-    return this.transactionsRepo.find({
+    const [items, total] = await this.transactionsRepo.findAndCount({
       where: { wallet_id: wallet.id },
       order: { created_at: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
       relations: [
         'order_item',
         'order_item.course',
@@ -54,6 +56,14 @@ export class WalletsService {
         'order_item.order.student',
       ],
     });
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getMasterLedger(query: {
@@ -71,7 +81,11 @@ export class WalletsService {
       .leftJoinAndSelect('user.profile', 'profile')
       .leftJoinAndSelect('tx.order_item', 'order_item')
       .leftJoinAndSelect('order_item.course', 'course')
+      .leftJoinAndSelect('course.instructor', 'courseInstructor')
+      .leftJoinAndSelect('courseInstructor.profile', 'instructorProfile')
       .leftJoinAndSelect('order_item.order', 'order')
+      .leftJoinAndSelect('order.student', 'student')
+      .leftJoinAndSelect('student.profile', 'studentProfile')
       .orderBy('tx.created_at', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);

@@ -36,9 +36,13 @@ export class WalletsController {
   }
 
   @Get('me/transactions')
-  @Roles('INSTRUCTOR', 'STUDENT', 'STAFF', 'ADMIN')
-  getTransactions(@CurrentUser() user: User) {
-    return this.walletsService.getTransactionHistory(user.id);
+  @Roles('INSTRUCTOR', 'STUDENT')
+  getMyTransactions(
+    @CurrentUser('id') userId: number,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.walletsService.getTransactionHistory(userId, Number(page), Number(limit));
   }
 
   @Get('me/payouts')

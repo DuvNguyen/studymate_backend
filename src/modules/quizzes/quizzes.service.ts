@@ -50,40 +50,97 @@ export class QuizzesService {
   }
 
   async startAttempt(quizId: number, userId: number) {
+    console.log(`[QuizzesService] startAttempt called for quizId: ${quizId}, userId: ${userId}`);
     const quiz = await this.getQuiz(quizId);
+    console.log(`[QuizzesService] Quiz found: ${quiz?.title}`);
 
     // Check attempt limits
     const attempts = await this.getUserAttempts(quizId, userId);
+    console.log(`[QuizzesService] Past attempts count: ${attempts.length}`);
     if (quiz.isFinal && attempts.length >= 2) {
       throw new BadRequestException('BẠN ĐÃ HẾT LƯỢT LÀM BÀI KIỂM TRA CUỐI KHÓA (TỐI ĐA 2 LẦN)');
     }
 
     // Pick random questions from bank
-    const allQuestions = await this.questionRepository.find({
-      where: { bankId: quiz.bankId, isActive: true },
-      relations: ['options'],
-    });
+    let picked: QuestionBankQuestion[] = [];
+    const isCustom = (quiz.numEasy + quiz.numMedium + quiz.numHard) > 0;
 
-    if (allQuestions.length === 0) {
-      throw new BadRequestException('NGÂN HÀNG CÂU HỎI TRỐNG, VUI LÒNG LIÊN HỆ GIẢNG VIÊN');
+    if (isCustom) {
+      console.log(`[QuizzesService] Custom mode active. Easy:${quiz.numEasy}, Med:${quiz.numMedium}, Hard:${quiz.numHard}`);
+      // Logic for Custom distribution
+      const difficultyMap = [
+        { type: 'EASY', count: quiz.numEasy },
+        { type: 'MEDIUM', count: quiz.numMedium },
+        { type: 'HARD', count: quiz.numHard },
+      ];
+
+      for (const diff of difficultyMap) {
+         if (diff.count > 0) {
+            const questions = await this.questionRepository.find({
+               where: { 
+                 bankId: quiz.bankId, 
+                 isActive: true, 
+                 difficulty: diff.type as any,
+                 ...(quiz.sectionId ? { sectionId: quiz.sectionId } : {})
+               },
+               relations: ['options'],
+            });
+            console.log(`[QuizzesService] Found ${questions.length} questions for ${diff.type}`);
+            // Shuffle subset and take required count
+            const shuffled = questions.sort(() => 0.5 - Math.random());
+            picked = [...picked, ...shuffled.slice(0, Math.min(diff.count, questions.length))];
+         }
+      }
+      // Shuffle combined set
+      picked = picked.sort(() => 0.5 - Math.random());
+    } else {
+      console.log(`[QuizzesService] Random mode active. Priority: ${quiz.difficulty || 'NONE'}`);
+      // Original Random logic
+      const where: any = { bankId: quiz.bankId, isActive: true };
+      if (quiz.sectionId) where.sectionId = quiz.sectionId;
+      if (quiz.difficulty) where.difficulty = quiz.difficulty;
+
+      const allQuestions = await this.questionRepository.find({
+        where,
+        relations: ['options'],
+      });
+      console.log(`[QuizzesService] Total matching questions: ${allQuestions.length}`);
+
+      if (allQuestions.length === 0) {
+        throw new BadRequestException('NGÂN HÀNG CÂU HỎI TRỐNG, VUI LÒNG LIÊN HỆ GIẢNG VIÊN');
+      }
+
+      const shuffled = allQuestions.sort(() => 0.5 - Math.random());
+      picked = shuffled.slice(0, Math.min(quiz.numQuestions, allQuestions.length));
     }
 
-    // Shuffle and pick
-    const shuffled = allQuestions.sort(() => 0.5 - Math.random());
-    const picked = shuffled.slice(0, Math.min(quiz.numQuestions, allQuestions.length));
+    console.log(`[QuizzesService] Final picked count: ${picked.length}`);
 
     // Prepare snapshots (randomize options too)
     const snapshots = picked.map(q => {
-      const options = q.options.sort(() => 0.5 - Math.random()).map(o => ({
-        id: o.id,
-        text: o.optionText,
-      }));
+      const correctOptions = q.options.filter(o => o.isCorrect);
+      const incorrectOptions = q.options.filter(o => !o.isCorrect);
+
+      // Pick 1 correct option (randomly if multiple exist)
+      const pickedCorrect = correctOptions.sort(() => 0.5 - Math.random()).slice(0, 1);
+      
+      // Pick 3 random incorrect options
+      const pickedIncorrect = incorrectOptions.sort(() => 0.5 - Math.random()).slice(0, 3);
+
+      // Combine and shuffle the final 4 options
+      const finalOptions = [...pickedCorrect, ...pickedIncorrect]
+        .sort(() => 0.5 - Math.random())
+        .map(o => ({
+          id: o.id,
+          text: o.optionText,
+        }));
+
       return {
         id: q.id,
         text: q.questionText,
         type: q.questionType,
-        points: 1, // Default 1 point per question for now
-        options,
+        points: 1,
+        options: finalOptions,
       };
     });
 
@@ -96,7 +153,11 @@ export class QuizzesService {
       startedAt: new Date(),
     });
 
-    return this.attemptRepository.save(attempt);
+    const saved = await this.attemptRepository.save(attempt);
+    return this.attemptRepository.findOne({
+       where: { id: saved.id },
+       relations: ['quiz']
+    });
   }
 
   async submitAttempt(attemptId: number, userId: number, answers: any) {
@@ -156,6 +217,11 @@ export class QuizzesService {
       ...saved,
       correctCount,
       totalCount,
+      correctAnswers: questionsWithCorrect.reduce((acc, q) => {
+        const correctOpt = q.options.find(o => o.isCorrect);
+        if (correctOpt) acc[q.id] = correctOpt.id;
+        return acc;
+      }, {} as Record<number, number>)
     };
   }
 

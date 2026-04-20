@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { Course } from '../entities/course.entity';
 import { QuestionBank } from '../entities/question-bank.entity';
@@ -16,118 +18,125 @@ export async function seedQuestionBanks(dataSource: DataSource) {
   const optionRepo = dataSource.getRepository(QuestionBankOption);
   const examRepo = dataSource.getRepository(Exam);
 
-  // Lấy course id = 1
-  const course = await courseRepo.findOne({ where: { id: 1 } });
+  // 1. Tìm khóa học Master Linux
+  const course = await courseRepo.findOne({ where: { slug: 'master-linux-ubuntu' } });
   if (!course) {
-    console.log('Không tìm thấy Course ID 1, bỏ qua seed ngân hàng câu hỏi.');
+    console.log('Không tìm thấy Course Master Linux, bỏ qua seed ngân hàng câu hỏi.');
     return;
   }
 
-  // Chuyển instructor_id thành 62 theo yêu cầu
-  course.instructorId = 62;
-  await courseRepo.save(course);
-  console.log('Đã chuyển Instructor của Course ID 1 thành 62.');
+  const instructorId = course.instructorId; // 65
 
-  // Xóa dữ liệu cũ nếu chạy lại (cascade tự lo liệu hoặc manually clean up)
-  await examRepo.delete({ courseId: 1 });
-  await qbRepo.delete({ courseId: 1 });
+  // Xóa dữ liệu cũ của khóa học này để seed lại sạch sẽ
+  await examRepo.delete({ courseId: course.id });
+  await qbRepo.delete({ courseId: course.id });
 
-  // 1. Tạo Ngân hàng câu hỏi
+  // 2. Tạo Ngân hàng câu hỏi
   const bank = qbRepo.create({
-    courseId: 1,
-    title: 'Ngân hàng đề thi Web Cơ Bản',
-    description:
-      'Tập hợp các câu hỏi trắc nghiệm Web và React cho khóa học mẫu',
+    courseId: course.id,
+    title: 'Ngân hàng câu hỏi chuẩn: Linux Masterclass',
+    description: 'Tập hợp 150 câu hỏi trắc nghiệm từ cơ bản đến nâng cao về Linux Ubuntu.',
   });
   const savedBank = await qbRepo.save(bank);
 
-  // 2. Tạo câu hỏi 1
-  const q1 = questionRepo.create({
-    bankId: savedBank.id,
-    questionText: 'Thuộc tính nào trong CSS được dùng để thay đổi màu chữ?',
-    questionType: QuestionType.MCQ,
-    difficulty: QuestionDifficulty.EASY,
-    isActive: true,
-    addedById: 62,
+  // 3. Đọc và parse CSV
+  const csvPath = path.join(process.cwd(), '../docs/ngan_hang_cau_hoi_linux_150.csv');
+  if (!fs.existsSync(csvPath)) {
+    console.error(`Không tìm thấy file CSV tại: ${csvPath}`);
+    return;
+  }
+
+  const content = fs.readFileSync(csvPath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim() !== '');
+
+  console.log(`Bắt đầu import ${lines.length - 1} câu hỏi từ CSV...`);
+
+  function parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(cur.trim());
+        cur = '';
+      } else {
+        cur += char;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  // Lấy các Sections của khóa học để gán câu hỏi
+  const sections = await dataSource.getRepository('sections').find({
+    where: { courseId: course.id },
+    order: { position: 'ASC' }
   });
-  const savedQ1 = await questionRepo.save(q1);
 
-  await optionRepo.save([
-    {
-      questionId: savedQ1.id,
-      optionText: 'font-color',
-      isCorrect: false,
-      sortOrder: 1,
-    },
-    {
-      questionId: savedQ1.id,
-      optionText: 'text-color',
-      isCorrect: false,
-      sortOrder: 2,
-    },
-    {
-      questionId: savedQ1.id,
-      optionText: 'color',
-      isCorrect: true,
-      sortOrder: 3,
-    },
-    {
-      questionId: savedQ1.id,
-      optionText: 'fgcolor',
-      isCorrect: false,
-      sortOrder: 4,
-    },
-  ]);
+  // Skip header line
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 3) continue;
 
-  // 2. Tạo câu hỏi 2
-  const q2 = questionRepo.create({
-    bankId: savedBank.id,
-    questionText:
-      'React hook nào được dùng để quản lý state trong functional component?',
-    questionType: QuestionType.MCQ,
-    difficulty: QuestionDifficulty.MEDIUM,
-    isActive: true,
-    addedById: 62,
-  });
-  const savedQ2 = await questionRepo.save(q2);
+    const questionText = cols[1];
+    const correctAnswer = cols[2];
+    const wrongAnswers = cols.slice(3).filter(a => a !== '');
 
-  await optionRepo.save([
-    {
-      questionId: savedQ2.id,
-      optionText: 'useEffect',
-      isCorrect: false,
-      sortOrder: 1,
-    },
-    {
-      questionId: savedQ2.id,
-      optionText: 'useState',
-      isCorrect: true,
-      sortOrder: 2,
-    },
-    {
-      questionId: savedQ2.id,
-      optionText: 'useContext',
-      isCorrect: false,
-      sortOrder: 3,
-    },
-    {
-      questionId: savedQ2.id,
-      optionText: 'useReducer',
-      isCorrect: false,
-      sortOrder: 4,
-    },
-  ]);
+    // Phân bổ câu hỏi theo chương (giả định chia đôi)
+    const sectionIndex = i <= 80 ? 0 : 1;
+    const sectionId = sections[sectionIndex]?.id || null;
 
-  // 3. Tạo một đề thi mẫu (Blueprint)
+    // Ngẫu nhiên độ khó
+    const difficulties = [QuestionDifficulty.EASY, QuestionDifficulty.MEDIUM, QuestionDifficulty.HARD];
+    const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+
+    // Tạo câu hỏi
+    const question = questionRepo.create({
+      bankId: savedBank.id,
+      sectionId: sectionId, // Gán vào chương
+      questionText: questionText,
+      questionType: QuestionType.MCQ,
+      difficulty: difficulty, // Gán độ khó
+      isActive: true,
+      addedById: instructorId,
+    });
+    const savedQuestion = await questionRepo.save(question);
+
+    // Tạo options
+    const options = [
+      {
+        questionId: savedQuestion.id,
+        optionText: correctAnswer,
+        isCorrect: true,
+        sortOrder: 1,
+      }
+    ];
+
+    wrongAnswers.forEach((text, index) => {
+      options.push({
+        questionId: savedQuestion.id,
+        optionText: text,
+        isCorrect: false,
+        sortOrder: index + 2,
+      });
+    });
+
+    await optionRepo.save(options);
+  }
+
+  // 4. Tạo một đề thi mẫu (Blueprint)
   const exam = examRepo.create({
-    courseId: 1,
+    courseId: course.id,
     bankId: savedBank.id,
-    title: 'Bài kiểm tra cuối khóa 1',
-    description: 'Kiểm tra kiến thức tổng hợp sau khi hoàn thành khóa học',
-    timeLimit: 15,
-    createdById: 62,
+    title: 'Bài thi cuối khóa: Linux Master',
+    description: 'Bài kiểm tra tổng quát toàn bộ kiến thức Linux Ubuntu với 50 câu hỏi ngẫu nhiên.',
+    timeLimit: 60,
+    createdById: instructorId,
   });
   await examRepo.save(exam);
 
-  console.log('Seed ngân hàng câu hỏi, câu hỏi và đề thi thành công.');
+  console.log(`Seed thành công ngân hàng câu hỏi và đề thi cho Course ID ${course.id}.`);
 }

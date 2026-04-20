@@ -28,17 +28,17 @@ export class QuizzesController {
     return this.quizzesService.getQuizzesByCourse(courseId);
   }
 
-  @Get('quizzes/:id')
-  async getQuizDetail(@Param('id', ParseIntPipe) id: number) {
-    return this.quizzesService.getQuiz(id);
-  }
-
   @Get('quizzes/:id/attempts')
   async getMyAttempts(
     @CurrentUser() user: User,
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.quizzesService.getUserAttempts(id, user.id);
+  }
+
+  @Get('quizzes/:id')
+  async getQuizDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.quizzesService.getQuiz(id);
   }
 
   @Post('quizzes/:id/start')

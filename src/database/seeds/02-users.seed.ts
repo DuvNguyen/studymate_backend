@@ -57,9 +57,40 @@ export async function seedUsers(dataSource: DataSource) {
       where: { clerkUserId: data.clerkUserId },
     });
     if (!existing) {
-      await userRepo.save(data);
+      const newUser = await userRepo.save(data);
       console.log(`  Tạo user: ${data.email}`);
+      
+      // Tạo profile cho user mới
+      if (data.email === 'admin@studymate.vn') {
+        const staffRepo = dataSource.getRepository('staff_profiles');
+        await staffRepo.save({
+          user_id: newUser.id,
+          full_name: 'StudyMate Admin',
+          phoneNumber: '0123456789',
+        });
+      } else if (data.email.includes('instructor')) {
+        const profileRepo = dataSource.getRepository('profiles');
+        await profileRepo.save({
+          user_id: newUser.id,
+          full_name: data.email === 'nguyen.van.an@studymate.vn' ? 'Nguyễn Văn An' : 'Nguyễn Thị Bích Nguyễn',
+        });
+      }
     } else {
+      // Đảm bảo user cũ cũng có profile (Đặc biệt cho user 1 và 62 đã có sẵn)
+      const profileRepo = dataSource.getRepository('profiles');
+      const staffRepo = dataSource.getRepository('staff_profiles');
+
+      if (data.email === 'admin@studymate.vn') {
+          const profile = await profileRepo.findOne({ where: { user_id: existing.id } });
+          if (!profile) {
+              await profileRepo.save({ user_id: existing.id, fullName: 'StudyMate System' });
+          }
+      } else if (data.email === 'giangvien2@gmail.com' || data.email === 'nguyen.van.an@studymate.vn') {
+          const profile = await profileRepo.findOne({ where: { user_id: existing.id } });
+          if (!profile) {
+              await profileRepo.save({ user_id: existing.id, fullName: 'Giảng Viên Master' });
+          }
+      }
       console.log(`  User đã tồn tại: ${data.email}`);
     }
   }
