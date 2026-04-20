@@ -84,6 +84,18 @@ export class WalletsController {
     res.end(buffer);
   }
 
+  @Post('payouts/export-csv')
+  @Roles('ADMIN', 'STAFF')
+  async exportPayoutsCsv(@Body() body: { ids: number[] }, @Res() res: Response) {
+    const csv = await this.walletsService.exportPayoutsCsv(body.ids);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=studymate_payouts_${Date.now()}.csv`,
+    );
+    res.end(csv);
+  }
+
   @Post('payouts/reconcile')
   @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('file'))

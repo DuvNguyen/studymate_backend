@@ -14,6 +14,7 @@ export enum KycStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  PENDING_UPDATE = 'PENDING_UPDATE',
 }
 
 @Entity('instructor_profiles')
@@ -55,6 +56,9 @@ export class InstructorProfile {
 
   @Column({ type: 'jsonb', nullable: true, name: 'certificates' })
   certificates: any[];
+
+  @Column({ type: 'jsonb', nullable: true, name: 'pending_data' })
+  pendingData: any;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;

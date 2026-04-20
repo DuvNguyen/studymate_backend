@@ -43,27 +43,38 @@ export class WalletsService {
   }
 
   async getTransactionHistory(userId: number, page: number = 1, limit: number = 10) {
-    const wallet = await this.getMyWallet(userId);
-    const [items, total] = await this.transactionsRepo.findAndCount({
-      where: { wallet_id: wallet.id },
-      order: { created_at: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-      relations: [
-        'order_item',
-        'order_item.course',
-        'order_item.order',
-        'order_item.order.student',
-      ],
-    });
+    try {
+      const wallet = await this.getMyWallet(userId);
+      console.log(`[WalletsService] Fetching transactions for wallet ID: ${wallet.id}`);
 
-    return {
-      items,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+      const qb = this.transactionsRepo.createQueryBuilder('tx')
+        .leftJoinAndSelect('tx.order_item', 'orderItem')
+        .leftJoinAndSelect('orderItem.course', 'course')
+        .leftJoinAndSelect('orderItem.order', 'orderHead')
+        .leftJoinAndSelect('orderHead.student', 'student')
+        .leftJoinAndSelect('student.profile', 'studentProfile')
+        .where('tx.wallet_id = :walletId', { walletId: wallet.id })
+        .andWhere('tx.status != :pendingStatus', { pendingStatus: 'PENDING' })
+        .orderBy('tx.created_at', 'DESC');
+      
+      console.log('[WalletsService] SQL:', qb.getSql());
+
+      const [items, total] = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      console.error('[WalletsService] CRITICAL Error in getTransactionHistory:', error);
+      throw error;
+    }
   }
 
   async getMasterLedger(query: {
@@ -151,12 +162,13 @@ export class WalletsService {
       wallet.balance_available = Number(wallet.balance_available) - dto.amount;
       await queryRunner.manager.save(wallet);
 
-      // 3. Log transaction
+      // 3. Log transaction (Hidden until approved)
       const transaction = queryRunner.manager.create(Transaction, {
         wallet_id: wallet.id,
+        payout_id: payout.id,
         transaction_type: 'WITHDRAWAL',
         amount: -dto.amount,
-        status: 'AVAILABLE',
+        status: 'PENDING',
         balance_after: Number(wallet.balance_available) + Number(wallet.balance_pending),
       });
       await queryRunner.manager.save(transaction);
@@ -224,7 +236,22 @@ export class WalletsService {
       payout.processedAt = new Date();
       await queryRunner.manager.save(payout);
 
-      if (dto.status === PayoutStatus.REJECTED) {
+      // Find linked transaction to update status
+      const linkedTx = await queryRunner.manager.findOne(Transaction, {
+        where: { payout_id: payout.id }
+      });
+
+      if (dto.status === PayoutStatus.COMPLETED) {
+        if (linkedTx) {
+          linkedTx.status = 'AVAILABLE'; // Or 'COMPLETED'
+          await queryRunner.manager.save(linkedTx);
+        }
+      } else if (dto.status === PayoutStatus.REJECTED) {
+        if (linkedTx) {
+          linkedTx.status = 'CANCELLED';
+          await queryRunner.manager.save(linkedTx);
+        }
+
         // Refund back to available balance
         const wallet = await queryRunner.manager.findOne(Wallet, {
           where: { user_id: payout.instructorId },
@@ -235,14 +262,14 @@ export class WalletsService {
           await queryRunner.manager.save(wallet);
 
           // Log refund transaction
-          const transaction = queryRunner.manager.create(Transaction, {
+          const refundTx = queryRunner.manager.create(Transaction, {
             wallet_id: wallet.id,
             transaction_type: 'REFUND',
             amount: Number(payout.amount),
             status: 'AVAILABLE',
             balance_after: Number(wallet.balance_available) + Number(wallet.balance_pending),
           });
-          await queryRunner.manager.save(transaction);
+          await queryRunner.manager.save(refundTx);
         }
       }
 
@@ -358,6 +385,24 @@ export class WalletsService {
     return workbook.xlsx.writeBuffer();
   }
 
+  async exportPayoutsCsv(ids: number[]): Promise<string> {
+    const payouts = await this.payoutsRepo.find({
+      where: { id: In(ids) },
+      relations: ['instructor', 'instructor.profile'],
+    });
+
+    if (!payouts.length) {
+      throw new NotFoundException('Không tìm thấy phiếu rút tiền nào');
+    }
+
+    let csv = 'payout_id,status,note\n';
+    for (const po of payouts) {
+      // Default to SUCCESS for mock purposes, but empty status is also fine for manual fill
+      csv += `PO-${po.id},SUCCESS,"StudyMate Payout PO-${po.id}"\n`;
+    }
+    return csv;
+  }
+
   async reconcilePayouts(
     csvContent: string,
   ): Promise<{ processed: number; success: number; failed: number; errors: string[] }> {
@@ -404,12 +449,31 @@ export class WalletsService {
           payout.adminNote = note || 'Đối soát tự động: Thành công';
           payout.processedAt = new Date();
           await queryRunner.manager.save(payout);
+
+          // Update linked transaction
+          const linkedTx = await queryRunner.manager.findOne(Transaction, {
+            where: { payout_id: payout.id }
+          });
+          if (linkedTx) {
+            linkedTx.status = 'AVAILABLE';
+            await queryRunner.manager.save(linkedTx);
+          }
+          
           results.success++;
         } else if (status === 'FAILED' || status === 'REJECTED') {
           payout.status = PayoutStatus.REJECTED;
           payout.adminNote = note || 'Đối soát tự động: Thất bại';
           payout.processedAt = new Date();
           await queryRunner.manager.save(payout);
+
+          // Update linked transaction
+          const linkedTx = await queryRunner.manager.findOne(Transaction, {
+            where: { payout_id: payout.id }
+          });
+          if (linkedTx) {
+            linkedTx.status = 'CANCELLED';
+            await queryRunner.manager.save(linkedTx);
+          }
 
           // Refund balance
           const wallet = await queryRunner.manager.findOne(Wallet, {

@@ -7,6 +7,7 @@ import { Section } from '../../database/entities/section.entity';
 import { Lesson } from '../../database/entities/lesson.entity';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { User } from '../../database/entities/user.entity';
+import { Enrollment } from '../../database/entities/enrollment.entity';
 import { CoursesController } from './courses.controller';
 import { InstructorCoursesController } from './instructor-courses.controller';
 import { AdminCoursesController } from './admin-courses.controller';
@@ -23,6 +24,7 @@ import { AuthModule } from '../auth/auth.module';
       Lesson,
       Quiz,
       User,
+      Enrollment,
     ]),
   ],
   controllers: [

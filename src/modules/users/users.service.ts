@@ -146,6 +146,7 @@ export class UsersService {
       rejectionReason: profile.rejectionReason,
       certificates: profile.certificates || [],
       documents: user.instructorDocuments || [],
+      pendingData: profile.pendingData,
     };
   }
 
@@ -167,29 +168,36 @@ export class UsersService {
       profile = this.instructorProfileRepo.create({ userId: user.id });
     }
 
-    // Cập nhật thông tin profile
-    if (dto.idCardUrl !== undefined) profile.idCardUrl = dto.idCardUrl;
-    if (dto.bankAccountName !== undefined)
-      profile.bankAccountName = dto.bankAccountName;
-    if (dto.bankAccountNumber !== undefined)
-      profile.bankAccountNumber = dto.bankAccountNumber;
-    if (dto.bankName !== undefined) profile.bankName = dto.bankName;
-    if (dto.certificates !== undefined) profile.certificates = dto.certificates;
+    if (profile.kycStatus === KycStatus.APPROVED) {
+      // Nếu đã APPROVED, lưu vào pending_data để Admin duyệt
+      profile.pendingData = { ...dto };
+      profile.kycStatus = KycStatus.PENDING_UPDATE;
+      await this.instructorProfileRepo.save(profile);
+    } else {
+      // Chưa được duyệt hoặc bị từ chối -> Cập nhật trực tiếp
+      if (dto.idCardUrl !== undefined) profile.idCardUrl = dto.idCardUrl;
+      if (dto.bankAccountName !== undefined)
+        profile.bankAccountName = dto.bankAccountName;
+      if (dto.bankAccountNumber !== undefined)
+        profile.bankAccountNumber = dto.bankAccountNumber;
+      if (dto.bankName !== undefined) profile.bankName = dto.bankName;
+      if (dto.certificates !== undefined) profile.certificates = dto.certificates;
 
-    // Đang PENDING chuyển thành PENDING_REVIEW (hoặc giữ nguyên để chờ Admin)
-    profile.kycStatus = KycStatus.PENDING; // Tạm khóa trạng thái
-    await this.instructorProfileRepo.save(profile);
+      profile.kycStatus = KycStatus.PENDING;
+      profile.rejectionReason = ''; // Clear lý do cũ nếu có
+      await this.instructorProfileRepo.save(profile);
 
-    // Cập nhật Document: Xoá cũ, Thêm mới (Cơ bản)
-    if (dto.documents && dto.documents.length > 0) {
-      await this.instructorDocumentRepo.delete({ userId: user.id });
-      const newDocs = dto.documents.map((doc) =>
-        this.instructorDocumentRepo.create({
-          userId: user.id,
-          ...doc,
-        }),
-      );
-      await this.instructorDocumentRepo.save(newDocs);
+      // Cập nhật Document: Xoá cũ, Thêm mới (Chỉ áp dụng cho Initial/Rejected)
+      if (dto.documents && dto.documents.length > 0) {
+        await this.instructorDocumentRepo.delete({ userId: user.id });
+        const newDocs = dto.documents.map((doc) =>
+          this.instructorDocumentRepo.create({
+            userId: user.id,
+            ...doc,
+          }),
+        );
+        await this.instructorDocumentRepo.save(newDocs);
+      }
     }
 
     return this.getInstructorKyc(clerkUserId);
@@ -254,7 +262,8 @@ export class UsersService {
       .createQueryBuilder('user')
       .innerJoinAndSelect('user.instructorProfile', 'instructorProfile')
       .leftJoinAndSelect('user.instructorDocuments', 'instructorDocuments')
-      .leftJoinAndSelect('user.profile', 'profile');
+      .leftJoinAndSelect('user.profile', 'profile')
+      .leftJoinAndSelect('user.role', 'role');
 
     if (status && status !== 'ALL') {
       qb.where('instructorProfile.kyc_status = :status', { status });
@@ -287,9 +296,55 @@ export class UsersService {
     if (!user || !user.instructorProfile)
       throw new NotFoundException('Không tìm thấy giảng viên hoặc KYC');
 
-    user.instructorProfile.kycStatus = status;
-    user.instructorProfile.rejectionReason = reason || '';
-    await this.instructorProfileRepo.save(user.instructorProfile);
+    const oldStatus = user.instructorProfile.kycStatus;
+
+    if (oldStatus === KycStatus.PENDING_UPDATE && status === KycStatus.APPROVED) {
+      // Duyệt Cập nhật: Merge pendingData vào profile chính
+      const pData = user.instructorProfile.pendingData;
+      if (pData) {
+        if (pData.idCardUrl !== undefined)
+          user.instructorProfile.idCardUrl = pData.idCardUrl;
+        if (pData.bankAccountName !== undefined)
+          user.instructorProfile.bankAccountName = pData.bankAccountName;
+        if (pData.bankAccountNumber !== undefined)
+          user.instructorProfile.bankAccountNumber = pData.bankAccountNumber;
+        if (pData.bankName !== undefined)
+          user.instructorProfile.bankName = pData.bankName;
+        if (pData.certificates !== undefined)
+          user.instructorProfile.certificates = pData.certificates;
+
+        // Cập nhật documents nếu có
+        if (pData.documents && pData.documents.length > 0) {
+          await this.instructorDocumentRepo.delete({ userId: user.id });
+          const newDocs = pData.documents.map((doc: any) =>
+            this.instructorDocumentRepo.create({
+              userId: user.id,
+              ...doc,
+            }),
+          );
+          await this.instructorDocumentRepo.save(newDocs);
+        }
+      }
+      user.instructorProfile.pendingData = null;
+    } else if (
+      oldStatus === KycStatus.PENDING_UPDATE &&
+      status === KycStatus.REJECTED
+    ) {
+      // Từ chối Cập nhật: Xoá pendingData, giữ lại dữ liệu cũ đã Approved
+      user.instructorProfile.pendingData = null;
+      user.instructorProfile.kycStatus = KycStatus.APPROVED;
+      user.instructorProfile.rejectionReason = reason || 'Cập nhật bị từ chối';
+      await this.instructorProfileRepo.save(user.instructorProfile);
+      // Gửi thông báo từ chối cập nhật (Logic thông báo ở dưới)
+    } else {
+      // Trường hợp Duyệt mới (Initial) hoặc duyệt lại từ Rejected
+      user.instructorProfile.kycStatus = status;
+      user.instructorProfile.rejectionReason = reason || '';
+    }
+
+    if (oldStatus !== KycStatus.PENDING_UPDATE || status === KycStatus.APPROVED) {
+      await this.instructorProfileRepo.save(user.instructorProfile);
+    }
 
     // Nếu Approve, cập nhật Role của User lên INSTRUCTOR
     if (status === KycStatus.APPROVED) {

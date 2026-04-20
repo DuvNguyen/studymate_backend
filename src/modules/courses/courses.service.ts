@@ -4,10 +4,13 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Course, CourseStatus, CourseLevel } from '../../database/entities/course.entity';
 import { Category } from '../../database/entities/category.entity';
 import { Quiz } from '../../database/entities/quiz.entity';
+import { Enrollment } from '../../database/entities/enrollment.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 import { CourseQueryDto } from './dto/course-query.dto';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -31,6 +34,9 @@ export class CoursesService {
     private readonly categoriesRepository: Repository<Category>,
     @InjectRepository(Quiz)
     private readonly quizRepository: Repository<Quiz>,
+    @InjectRepository(Enrollment)
+    private readonly enrollmentsRepository: Repository<Enrollment>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -408,13 +414,43 @@ export class CoursesService {
     return result;
   }
 
-  async softDeleteCourse(instructorId: number, id: number): Promise<void> {
+  async archiveCourse(instructorId: number, id: number): Promise<void> {
     const course = await this.coursesRepository.findOne({
       where: { id, instructorId },
     });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
 
     course.status = CourseStatus.ARCHIVED;
+    await this.coursesRepository.save(course);
+
+    // Gửi thông báo cho tất cả học viên đã mua khóa học
+    const enrollments = await this.enrollmentsRepository.find({
+      where: { course_id: id, is_active: true },
+    });
+
+    const studentIds = [...new Set(enrollments.map((e) => e.student_id))];
+
+    if (studentIds.length > 0) {
+      for (const studentId of studentIds) {
+        await this.notificationsService.sendNotification(
+          studentId,
+          NotificationType.COURSE,
+          'Khóa học đã được lưu trữ',
+          `Khóa học "${course.title}" đã được giảng viên lưu trữ. Bạn hiện không thể vào học nội dung này cho đến khi giảng viên mở lại.`,
+          { courseId: course.id, slug: course.slug },
+        );
+      }
+    }
+  }
+
+  async unarchiveCourse(instructorId: number, id: number): Promise<void> {
+    const course = await this.coursesRepository.findOne({
+      where: { id, instructorId },
+    });
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+
+    // Chuyển lại thành PUBLISHED (hoặc có thể là DRAFT tùy logic, nhưng ở đây mặc định là PUBLISHED để bán lại)
+    course.status = CourseStatus.PUBLISHED;
     await this.coursesRepository.save(course);
   }
 

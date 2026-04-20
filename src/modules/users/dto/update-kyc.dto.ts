@@ -19,6 +19,15 @@ export class InstructorDocumentDto {
   fileUrl: string;
 }
 
+export class CertificateDto {
+  @IsString()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  fileUrl?: string;
+}
+
 export class UpdateKycDto {
   @IsOptional()
   @IsString()
@@ -44,5 +53,7 @@ export class UpdateKycDto {
 
   @IsOptional()
   @IsArray()
-  certificates?: any[];
+  @ValidateNested({ each: true })
+  @Type(() => CertificateDto)
+  certificates?: CertificateDto[];
 }

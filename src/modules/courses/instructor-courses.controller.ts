@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -33,10 +34,16 @@ export class InstructorCoursesController {
     return this.coursesService.findByInstructor(user.id, query);
   }
 
-  @Delete(':id')
-  async softDeleteCourse(@CurrentUser() user: User, @Param('id') id: number) {
-    await this.coursesService.softDeleteCourse(user.id, id);
+  @Patch(':id/archive')
+  async archiveCourse(@CurrentUser() user: User, @Param('id') id: number) {
+    await this.coursesService.archiveCourse(user.id, id);
     return { success: true, message: 'Khóa học đã được đưa vào lưu trữ' };
+  }
+
+  @Patch(':id/unarchive')
+  async unarchiveCourse(@CurrentUser() user: User, @Param('id') id: number) {
+    await this.coursesService.unarchiveCourse(user.id, id);
+    return { success: true, message: 'Khóa học đã được mở lưu trữ' };
   }
 
   @Post()
