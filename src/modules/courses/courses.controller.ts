@@ -24,6 +24,11 @@ export class CoursesController {
     return this.coursesService.findPublicCourses(query);
   }
 
+  @Get('suggest')
+  async suggest(@Query('q') q: string) {
+    return this.coursesService.suggestCourses(q);
+  }
+
   /**
    * GET /api/v1/courses/:slug
    * Lấy chi tiết khóa học theo slug — public.

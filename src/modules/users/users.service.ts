@@ -1,10 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { Role } from '../../database/entities/role.entity';
 import { Profile } from '../../database/entities/profile.entity';
@@ -26,6 +22,7 @@ import {
 } from './dto/update-user-admin.dto';
 import { createClerkClient } from '@clerk/backend';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SearchService } from '../search/search.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 
 export interface PaginationMeta {
@@ -56,6 +53,8 @@ export class UsersService {
     @InjectRepository(StaffProfile)
     private staffProfileRepo: Repository<StaffProfile>,
     private notificationsService: NotificationsService,
+    @Inject(forwardRef(() => SearchService))
+    private searchService: SearchService,
   ) {}
 
   async findOneByClerkId(clerkUserId: string): Promise<User | null> {
@@ -111,6 +110,9 @@ export class UsersService {
     await this.profileRepo.save(user.profile);
     await this.userRepo.save(user);
 
+    // Sync to Meilisearch
+    await this.searchService.indexUser(this.toSearchDocument(user));
+
     return this.toPublicProfile(user);
   }
 
@@ -151,6 +153,7 @@ export class UsersService {
   }
 
   async updateInstructorKyc(clerkUserId: string, dto: UpdateKycDto) {
+    console.log('updateInstructorKyc DTO:', JSON.stringify(dto, null, 2));
     const user = await this.userRepo.findOne({
       where: { clerkUserId },
       relations: ['instructorProfile', 'instructorDocuments'],
@@ -326,6 +329,7 @@ export class UsersService {
         }
       }
       user.instructorProfile.pendingData = null;
+      user.instructorProfile.kycStatus = KycStatus.APPROVED;
     } else if (
       oldStatus === KycStatus.PENDING_UPDATE &&
       status === KycStatus.REJECTED
@@ -419,14 +423,45 @@ export class UsersService {
       .skip(skip)
       .take(limit);
 
+    if (search) {
+      // Use Meilisearch for Admin user search
+      const searchOptions: any = {
+        limit,
+        offset: skip,
+        filter: [`role != "ADMIN"`], // Admin doesn't manage other admins as per original logic
+      };
+
+      if (role) {
+        searchOptions.filter.push(`role = "${role}"`);
+      }
+      if (status) {
+        searchOptions.filter.push(`status = "${status}"`);
+      }
+
+      const searchResult = await this.searchService.searchUsers(search, searchOptions);
+      const total = (searchResult as any).totalHits || (searchResult as any).estimatedTotalHits || searchResult.hits.length || 0;
+
+      const users = await this.userRepo.find({
+        where: { id: In(searchResult.hits.map(h => h.id)) },
+        relations: ['role', 'profile', 'instructorProfile'],
+      });
+
+      // Maintain order
+      const orderedUsers = searchResult.hits.map(hit => users.find(u => u.id === hit.id)).filter(Boolean);
+
+      return {
+        data: (orderedUsers as User[]).map((u) => this.toPublicProfile(u)),
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
     if (role) {
       qb.andWhere('role.role_name = :role', { role: role });
-    }
-    if (status) {
-      qb.andWhere('user.status = :status', { status });
-    }
-    if (search) {
-      qb.andWhere('user.email ILIKE :search', { search: `%${search}%` });
     }
 
     // Admin không quản lý Admin
@@ -559,6 +594,7 @@ export class UsersService {
         'role',
         'profile',
         'instructorProfile',
+        'instructorDocuments',
         'courses',
         'courses.category',
       ],
@@ -569,12 +605,64 @@ export class UsersService {
       throw new ForbiddenException('Người dùng này không phải là giảng viên');
     }
 
+    // Sync with Clerk to ensure name/avatar are up to date
+    let fullName = user.profile?.fullName || user.email || 'Giảng viên StudyMate';
+    let avatarUrl = user.avatarUrl;
+
+    try {
+      const clerk = createClerkClient({
+        secretKey: process.env.CLERK_SECRET_KEY,
+      });
+      const clerkUser = await clerk.users.getUser(user.clerkUserId);
+      const clerkFullName = (clerkUser.firstName + ' ' + clerkUser.lastName).trim();
+      
+      let updated = false;
+      if (clerkFullName && user.profile?.fullName !== clerkFullName) {
+        if (!user.profile) {
+          user.profile = this.profileRepo.create({ userId: user.id, fullName: clerkFullName });
+        } else {
+          user.profile.fullName = clerkFullName;
+        }
+        await this.profileRepo.save(user.profile);
+        fullName = clerkFullName;
+        updated = true;
+      }
+      if (clerkUser.imageUrl && user.avatarUrl !== clerkUser.imageUrl) {
+        user.avatarUrl = clerkUser.imageUrl;
+        avatarUrl = clerkUser.imageUrl;
+        updated = true;
+      }
+      if (updated) {
+        await this.userRepo.save(user);
+      }
+    } catch (e) {
+      console.warn(`[getPublicPortfolio] Failed to sync with Clerk for ${user.clerkUserId}:`, e.message);
+    }
+
+    // Combine manual certificates with verified documents
+    const rawManualCerts = user.instructorProfile?.certificates || [];
+    const manualCerts = rawManualCerts.map(cert => {
+      if (typeof cert === 'string') {
+        const [name, url] = cert.split(':');
+        return { name: name || cert, url: url || null };
+      }
+      return cert;
+    });
+
+    const verifiedDocs = (user.instructorDocuments || [])
+      .filter(doc => doc.isVerified)
+      .map(doc => ({
+        name: doc.title,
+        url: doc.fileUrl,
+        type: doc.documentType
+      }));
+
     return {
       id: user.id,
-      fullName: user.profile?.fullName || user.email || 'Giảng viên StudyMate',
-      avatarUrl: user.avatarUrl,
+      fullName,
+      avatarUrl,
       bio: user.profile?.bio ?? 'Chưa có thông tin giới thiệu.',
-      certificates: user.instructorProfile?.certificates || [],
+      certificates: [...manualCerts, ...verifiedDocs],
       courses: (user.courses || [])
         .filter((c) => c.status === 'PUBLISHED')
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -656,13 +744,46 @@ export class UsersService {
       instructorProfile: user.instructorProfile
         ? {
             bankName: user.instructorProfile.bankName,
+            bankAccountName: user.instructorProfile.bankAccountName,
+            bankAccountNumber: user.instructorProfile.bankAccountNumber,
+            idCardUrl: user.instructorProfile.idCardUrl,
             kycStatus: user.instructorProfile.kycStatus,
+            rejectionReason: user.instructorProfile.rejectionReason,
             certificates: user.instructorProfile.certificates,
+            pendingData: user.instructorProfile.pendingData,
             documents: user.instructorDocuments || [],
           }
         : null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+    };
+  }
+
+  /**
+   * Sync all users to Meilisearch.
+   */
+  async syncAllToMeili(): Promise<void> {
+    const users = await this.userRepo.find({
+      relations: ['role', 'profile'],
+    });
+
+    if (users.length > 0) {
+      const docs = users.map((user) => this.toSearchDocument(user));
+      await this.searchService.indexUsers(docs);
+      console.log(`Synced ${docs.length} users to Meilisearch.`);
+    } else {
+      console.log('No users found to sync.');
+    }
+  }
+
+  private toSearchDocument(user: User) {
+    return {
+      id: user.id,
+      fullName: user.profile?.fullName || user.email || null,
+      email: user.email,
+      role: user.role?.roleName || null,
+      status: user.status,
+      createdAt: user.createdAt.getTime(),
     };
   }
 }

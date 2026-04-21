@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { OrderItem } from './order-item.entity';
+import { Coupon } from './coupon.entity';
 
 export enum OrderStatus {
   PENDING = 'PENDING',
@@ -35,6 +36,13 @@ export class Order {
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order)
   order_items: OrderItem[];
+
+  @Column({ nullable: true, name: 'coupon_id' })
+  coupon_id: number;
+
+  @ManyToOne(() => Coupon)
+  @JoinColumn({ name: 'coupon_id' })
+  coupon: Coupon;
 
   @Column('decimal', { precision: 10, scale: 2, name: 'subtotal' })
   subtotal: number;

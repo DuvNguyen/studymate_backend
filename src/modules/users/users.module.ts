@@ -1,4 +1,4 @@
-import { Module, Global } from '@nestjs/common';
+import { Module, Global, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -10,6 +10,7 @@ import { InstructorProfile } from '../../database/entities/instructor-profile.en
 import { StaffProfile } from '../../database/entities/staff-profile.entity';
 import { InstructorDocument } from '../../database/entities/instructor-document.entity';
 import { PublicUsersController } from './public-users.controller';
+import { SearchModule } from '../search/search.module';
 
 @Global()
 @Module({
@@ -22,7 +23,8 @@ import { PublicUsersController } from './public-users.controller';
       StaffProfile,
       InstructorDocument,
     ]),
-    AuthModule, 
+    AuthModule,
+    forwardRef(() => SearchModule),
   ],
   controllers: [UsersController, PublicUsersController],
   providers: [UsersService],

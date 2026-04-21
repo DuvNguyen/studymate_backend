@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Course, CourseStatus, CourseLevel } from '../../database/entities/course.entity';
@@ -10,6 +6,7 @@ import { Category } from '../../database/entities/category.entity';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SearchService } from '../search/search.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { CourseQueryDto } from './dto/course-query.dto';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -37,6 +34,8 @@ export class CoursesService {
     @InjectRepository(Enrollment)
     private readonly enrollmentsRepository: Repository<Enrollment>,
     private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => SearchService))
+    private readonly searchService: SearchService,
   ) {}
 
   /**
@@ -198,9 +197,62 @@ export class CoursesService {
     }
 
     if (query.search) {
-      qb.andWhere('LOWER(course.title) LIKE LOWER(:search)', {
-        search: `%${query.search}%`,
+      // Use Meilisearch for search
+      const searchOptions: any = {
+        limit,
+        offset: skip,
+        filter: [`status = "${CourseStatus.PUBLISHED}"`],
+      };
+
+      if (query.level) {
+        searchOptions.filter.push(`level = "${query.level}"`);
+      }
+
+      if (query.categorySlug) {
+        // We need category ID for filtering in Meilisearch
+        const cat = await this.categoriesRepository.findOne({
+          where: { slug: query.categorySlug, isActive: true },
+          relations: ['children'],
+        });
+        if (cat) {
+          const categoryIds = [cat.id, ...cat.children.map((c) => c.id)];
+          searchOptions.filter.push(`categoryId IN [${categoryIds.join(',')}]`);
+        }
+      }
+
+      // Sorting
+      const sortBy = query.sortBy || 'publishedAt';
+      const sortOrder = query.sortOrder || 'DESC';
+      searchOptions.sort = [`${sortBy}:${sortOrder.toLowerCase()}`];
+
+      console.log('Meilisearch Query:', query.search);
+      console.log('Meilisearch Options:', JSON.stringify(searchOptions, null, 2));
+      const searchResult = await this.searchService.searchCourses(query.search, searchOptions);
+      console.log('Meilisearch Results Count:', searchResult.hits.length);
+      
+      const total = (searchResult as any).totalHits || (searchResult as any).estimatedTotalHits || searchResult.hits.length || 0;
+      const meta = Object.assign(new PaginationMetaDto(), {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       });
+
+      const result = new PaginatedCoursesDto();
+      // Since Search results return documents, we might need to map them back to DTOs or just use them if they are enough
+      // But for consistency, let's fetch from DB or map documents if they have all info
+      // To ensure relations like instructor/category are present, fetching from DB by IDs might be safer if documents are slim
+      const courses = await this.coursesRepository.find({
+        where: { id: In(searchResult.hits.map(h => h.id)) },
+        relations: ['instructor', 'instructor.profile', 'category'],
+      });
+      
+      // Maintain order from search result
+      const orderedCourses = searchResult.hits.map(hit => courses.find(c => c.id === hit.id)).filter(Boolean);
+
+      result.data = (orderedCourses as Course[]).map((c) => this.toDto(c));
+      result.meta = meta;
+      return result;
     }
 
     if (query.level) {
@@ -494,6 +546,10 @@ export class CoursesService {
       level: dto.level,
     });
     const saved = await this.coursesRepository.save(course);
+    
+    // Index in Meilisearch
+    await this.searchService.indexCourse(this.toSearchDocument(saved));
+
     return this.toDto(saved);
   }
 
@@ -509,6 +565,10 @@ export class CoursesService {
 
     Object.assign(course, dto);
     const saved = await this.coursesRepository.save(course);
+    
+    // Update Meilisearch
+    await this.searchService.indexCourse(this.toSearchDocument(saved));
+
     return this.toDto(saved);
   }
 
@@ -606,6 +666,10 @@ export class CoursesService {
     course.rejectionReason = null;
 
     const saved = await this.coursesRepository.save(course);
+
+    // Sync to Meilisearch on approval
+    await this.searchService.indexCourse(this.toSearchDocument(saved));
+
     return this.toDto(saved);
   }
 
@@ -639,5 +703,56 @@ export class CoursesService {
 
     const saved = await this.coursesRepository.save(course);
     return this.toDto(saved);
+  }
+
+  /**
+   * Get search suggestions (titles and slugs).
+   */
+  async suggestCourses(q: string) {
+    const searchOptions = {
+      limit: 5,
+      attributesToRetrieve: ['title', 'slug', 'thumbnailUrl'],
+      filter: [`status = "${CourseStatus.PUBLISHED}"`],
+    };
+
+    const result = await this.searchService.searchCourses(q, searchOptions);
+    return result.hits;
+  }
+
+  /**
+   * Sync all published courses to Meilisearch.
+   */
+  async syncAllToMeili(): Promise<void> {
+    const courses = await this.coursesRepository.find({
+      where: { status: CourseStatus.PUBLISHED },
+      relations: ['instructor', 'instructor.profile', 'category'],
+    });
+
+    if (courses.length > 0) {
+      const docs = courses.map((course) => this.toSearchDocument(course));
+      await this.searchService.indexCourses(docs);
+      console.log(`Synced ${docs.length} courses to Meilisearch.`);
+    } else {
+      console.log('No published courses found to sync.');
+    }
+  }
+
+  private toSearchDocument(course: Course) {
+    return {
+      id: course.id,
+      title: course.title,
+      description: course.description,
+      slug: course.slug,
+      thumbnailUrl: course.thumbnailUrl,
+      price: Number(course.price),
+      instructorName: course.instructor?.profile?.fullName || null,
+      instructorId: course.instructorId,
+      categoryName: course.category?.name || null,
+      categoryId: course.categoryId,
+      level: course.level,
+      status: course.status,
+      createdAt: course.createdAt.getTime(),
+      publishedAt: course.publishedAt ? course.publishedAt.getTime() : null,
+    };
   }
 }

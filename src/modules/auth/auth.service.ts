@@ -7,6 +7,7 @@ import {
   InstructorProfile,
   KycStatus,
 } from '../../database/entities/instructor-profile.entity';
+import { Profile } from '../../database/entities/profile.entity';
 import { createClerkClient } from '@clerk/backend';
 
 @Injectable()
@@ -20,13 +21,16 @@ export class AuthService {
 
     @InjectRepository(InstructorProfile)
     private instructorProfileRepo: Repository<InstructorProfile>,
+
+    @InjectRepository(Profile)
+    private profileRepo: Repository<Profile>,
   ) {}
 
   // Lấy user từ DB dựa theo clerkUserId (đã được verify bởi guard)
   async getUserByClerkId(clerkUserId: string): Promise<User> {
     const user = await this.userRepo.findOne({
       where: { clerkUserId },
-      relations: ['role', 'instructorProfile'],
+      relations: ['role', 'instructorProfile', 'profile'],
     });
 
     if (!user) {
@@ -50,6 +54,50 @@ export class AuthService {
   async getMe(clerkUserId: string) {
     const user = await this.getUserByClerkId(clerkUserId);
 
+    // Sync with Clerk to get latest info (Name, Avatar)
+    const clerk = createClerkClient({
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+    
+    let needsUpdate = false;
+    let firstName = '';
+    let lastName = '';
+    let fullName = '';
+
+    try {
+      const clerkUser = await clerk.users.getUser(clerkUserId);
+      firstName = clerkUser.firstName || '';
+      lastName = clerkUser.lastName || '';
+      fullName = (firstName + ' ' + lastName).trim();
+
+      // Sync Avatar
+      if (clerkUser.imageUrl && user.avatarUrl !== clerkUser.imageUrl) {
+        user.avatarUrl = clerkUser.imageUrl;
+        needsUpdate = true;
+      }
+
+      // Sync Name in Profile
+      if (!user.profile) {
+        user.profile = this.profileRepo.create({
+          userId: user.id,
+          fullName: fullName,
+        });
+        needsUpdate = true;
+      } else if (user.profile.fullName !== fullName && fullName !== '') {
+        user.profile.fullName = fullName;
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        await this.userRepo.save(user);
+        if (user.profile) await this.profileRepo.save(user.profile);
+      }
+    } catch (error) {
+      console.warn(`[AuthService] Failed to sync with Clerk for ${clerkUserId}:`, error.message);
+      // Fallback to local data
+      fullName = user.profile?.fullName || user.email.split('@')[0];
+    }
+
     return {
       id: user.id,
       email: user.email,
@@ -57,6 +105,9 @@ export class AuthService {
       avatarUrl: user.avatarUrl,
       role: user.role.roleName,
       status: user.status,
+      firstName: firstName || user.profile?.fullName?.split(' ')[0] || '',
+      lastName: lastName || user.profile?.fullName?.split(' ').slice(1).join(' ') || '',
+      fullName: fullName,
       kycStatus: user.instructorProfile?.kycStatus || null,
       bankName: user.instructorProfile?.bankName || null,
       bankAccountNumber: user.instructorProfile?.bankAccountNumber || null,
@@ -95,9 +146,14 @@ export class AuthService {
     const email = clerkUser.emailAddresses[0]?.emailAddress;
     if (!email) throw new Error('Không tìm thấy email từ Clerk');
 
+    const firstName = clerkUser.firstName || '';
+    const lastName = clerkUser.lastName || '';
+    const fullName = (firstName + ' ' + lastName).trim();
+
     // Tìm user theo clerkUserId (ưu tiên) hoặc email (phòng hờ account bị xóa trên Clerk nhưng còn kẹt trong DB)
     let user = await this.userRepo.findOne({
       where: [{ clerkUserId }, { email }],
+      relations: ['profile'],
     });
 
     try {
@@ -111,7 +167,14 @@ export class AuthService {
           status: UserStatus.ACTIVE,
         });
         user.role = roleRecord;
-        await this.userRepo.save(user);
+        const savedUser = await this.userRepo.save(user);
+
+        // Tạo profile mặc định
+        const profile = this.profileRepo.create({
+          userId: savedUser.id,
+          fullName: fullName,
+        });
+        await this.profileRepo.save(profile);
       } else {
         // Tự động Heal data nếu clerkUserId bị lệch (vì tạo lại acc cùng email trên Clerk)
         if (user.clerkUserId !== clerkUserId) {
@@ -122,6 +185,17 @@ export class AuthService {
         user.role = roleRecord;
         user.avatarUrl = clerkUser.imageUrl;
         await this.userRepo.save(user);
+
+        // Cập nhật profile nếu cần
+        if (!user.profile) {
+          await this.profileRepo.save({
+            userId: user.id,
+            fullName: fullName,
+          });
+        } else if (user.profile.fullName !== fullName && fullName !== '') {
+          user.profile.fullName = fullName;
+          await this.profileRepo.save(user.profile);
+        }
       }
     } catch (saveError: any) {
       // Nếu có lỗi tranh chấp (Webhook vừa tạo user xong), thử query lại lần nữa

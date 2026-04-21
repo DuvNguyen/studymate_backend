@@ -7,7 +7,7 @@ import { Readable } from 'stream';
 export class UploadsService {
   constructor(@Inject('CLOUDINARY') private readonly cloudinaryConfig: any) {}
 
-  async uploadImage(file: any): Promise<CloudinaryResponse> {
+  async uploadFile(file: any): Promise<CloudinaryResponse> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -15,7 +15,7 @@ export class UploadsService {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'studymate/images',
+          folder: 'studymate/kyc_documents',
           resource_type: 'auto',
         },
         (error, result) => {

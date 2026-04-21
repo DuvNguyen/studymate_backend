@@ -4,6 +4,7 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
@@ -14,16 +15,27 @@ import { AuthModule } from '../auth/auth.module';
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
-  @Post('image')
+  @Post()
   @UseGuards(ClerkAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  async uploadImage(@UploadedFile() file: any) {
-    const result = await this.uploadsService.uploadImage(file);
+  @UseInterceptors(FileInterceptor('file', {
+    fileFilter: (req, file, callback) => {
+      if (!file.mimetype.match(/\/(jpg|jpeg|png|gif|pdf)$/)) {
+        return callback(new BadRequestException('Chỉ cho phép tải lên tệp ảnh hoặc PDF'), false);
+      }
+      callback(null, true);
+    },
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+    }
+  }))
+  async upload(@UploadedFile() file: any) {
+    const result = await this.uploadsService.uploadFile(file);
     return {
       success: true,
       data: {
         url: result.secure_url,
         public_id: result.public_id,
+        format: result.format,
       },
     };
   }

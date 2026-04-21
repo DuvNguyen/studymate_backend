@@ -85,19 +85,32 @@ export class LessonProgressService {
     enrollmentId: number,
     courseId: number,
   ) {
-    // Count total lessons
-    const totalLessons = await this.lessonsRepo.count({
+    // Get all lessons in course to calculate granular progress
+    const allLessons = await this.lessonsRepo.find({
       where: { section: { courseId: courseId } },
     });
 
-    if (totalLessons === 0) return;
+    if (allLessons.length === 0) return;
 
-    // Count completed lessons
-    const completedLessons = await this.progressRepo.count({
-      where: { enrollment_id: enrollmentId, completed: true },
+    // Get all progress records for this enrollment
+    const progresses = await this.progressRepo.find({
+      where: { enrollment_id: enrollmentId },
     });
 
-    const percent = Math.round((completedLessons / totalLessons) * 100);
+    let totalValue = 0;
+    allLessons.forEach((lesson) => {
+      const prog = progresses.find((p) => p.lesson_id === lesson.id);
+      if (prog) {
+        if (prog.completed) {
+          totalValue += 1;
+        } else if (prog.watched_duration > 0 && lesson.durationSecs > 0) {
+          // Add partial completion (capped at 0.99)
+          totalValue += Math.min(prog.watched_duration / lesson.durationSecs, 0.99);
+        }
+      }
+    });
+
+    const percent = Math.floor((totalValue / allLessons.length) * 100);
 
     const enrollment = await this.enrollmentsRepo.findOne({
       where: { id: enrollmentId },

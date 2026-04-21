@@ -18,7 +18,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "sync:meili": "ts-node -r tsconfig-paths/register src/scripts/sync-meili.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.2.1",
@@ -38,6 +39,7 @@
     "exceljs": "^4.4.0",
     "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
+    "meilisearch": "^0.57.0",
     "multer": "^2.1.1",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",

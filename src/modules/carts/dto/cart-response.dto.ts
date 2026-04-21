@@ -9,6 +9,9 @@ export class CartCourseDto {
 
   @Expose()
   thumbnailUrl: string;
+
+  @Expose()
+  price: number;
 }
 
 export class CartItemResponseDto {

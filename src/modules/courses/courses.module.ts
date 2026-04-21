@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Course } from '../../database/entities/course.entity';
 import { Category } from '../../database/entities/category.entity';
@@ -13,6 +13,7 @@ import { InstructorCoursesController } from './instructor-courses.controller';
 import { AdminCoursesController } from './admin-courses.controller';
 import { CoursesService } from './courses.service';
 import { AuthModule } from '../auth/auth.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AuthModule } from '../auth/auth.module';
       User,
       Enrollment,
     ]),
+    forwardRef(() => SearchModule),
   ],
   controllers: [
     CoursesController,

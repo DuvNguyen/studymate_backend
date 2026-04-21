@@ -39,6 +39,28 @@ Request (JWT) -> Guard (Roles) -> Controller -> Service -> Repository -> Databas
 - `orders & enrollments`: Quy trình thanh toán, tạo đơn hàng và ghi danh khóa học.
 - `wallets`: Quản lý số dư và doanh thu cho Giảng viên.
 - `uploads`: Module dùng chung để xử lý file lên Cloudinary.
+- `search`: Tích hợp Meilisearch cho tìm kiếm hiệu năng cao trên Courses và Users.
+
+## 🔍 Hệ thống Tìm kiếm (Meilisearch)
+
+Hệ thống sử dụng **Meilisearch** để cung cấp trải nghiệm tìm kiếm tức thì và chịu lỗi chính tả.
+
+### 1. Cơ sở lý thuyết & Kiến trúc
+Chúng tôi sử dụng kĩ thuật **Application Layer Hooks**:
+- Khi dữ liệu được lưu vào DB (PostgreSQL), Backend sẽ đồng thời đẩy bản ghi đó sang Meilisearch.
+- Đảm bảo tính nhất quán dữ liệu mà không cần cấu hình phức tạp như CDC (Change Data Capture).
+
+### 2. Lệnh đồng bộ hóa (Manual Sync)
+Khi mới setup hoặc sau khi chạy Seed data, cần đồng bộ dữ liệu thủ công:
+```bash
+npm run sync:meili
+```
+
+### 3. Cài đặt Meilisearch
+Sử dụng Docker để chạy Meilisearch:
+```bash
+docker compose up -d meilisearch
+```
 
 ## 🛠️ Cài đặt và Chạy Project
 

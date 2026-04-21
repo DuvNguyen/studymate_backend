@@ -16,13 +16,23 @@ export class CourseShortResponseDto {
   @Expose()
   slug: string;
 }
-
 export class OrderItemShortDto {
+  @Expose()
+  final_price: number;
+}
+
+export class RefundRequestShortDto {
   @Expose()
   id: number;
 
   @Expose()
-  final_price: number;
+  status: string;
+
+  @Expose()
+  reason: string;
+
+  @Expose()
+  created_at: Date;
 }
 
 export class EnrollmentResponseDto {
@@ -54,4 +64,8 @@ export class EnrollmentResponseDto {
   @Expose()
   @Type(() => OrderItemShortDto)
   order_item: OrderItemShortDto;
+
+  @Expose()
+  @Type(() => RefundRequestShortDto)
+  refund_request: RefundRequestShortDto;
 }

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { RefundRequest, RefundStatus } from '../../database/entities/refund-request.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
@@ -75,16 +75,25 @@ export class RefundsService {
     });
 
     await this.refundRequestsRepo.save(refundRequest);
+    
+    // 1. Notify Student
+    await this.notificationsService.sendNotification(
+      userId,
+      NotificationType.ENROLLMENT,
+      'Yêu cầu hoàn tiền đã được gửi',
+      `Yêu cầu hoàn tiền cho khóa học "${enrollment.course.title}" của bạn đã được gửi thành công và đang chờ xử lý.`,
+      { refundId: refundRequest.id },
+    );
 
-    // Notify admins
-    const admins = await this.dataSource.manager.find(User, {
-      where: { role: { roleName: 'ADMIN' } },
+    // 2. Notify Admins and Staff
+    const staff = await this.dataSource.manager.find(User, {
+      where: { role: { roleName: In(['ADMIN', 'STAFF']) } },
       relations: ['role'],
     });
 
-    for (const admin of admins) {
+    for (const member of staff) {
       await this.notificationsService.sendNotification(
-        admin.id,
+        member.id,
         NotificationType.SYSTEM,
         'Yêu cầu hoàn tiền mới',
         `Học viên vừa yêu cầu hoàn tiền cho khóa học "${enrollment.course.title}".`,
@@ -106,7 +115,7 @@ export class RefundsService {
   async processRefund(adminId: number, requestId: number, dto: ProcessRefundDto) {
     const refundRequest = await this.refundRequestsRepo.findOne({
       where: { id: requestId },
-      relations: ['enrollment', 'enrollment.order_item', 'enrollment.course', 'student'],
+      relations: ['enrollment', 'enrollment.order_item', 'enrollment.course', 'student', 'course'],
     });
 
     if (!refundRequest) throw new NotFoundException('Không tìm thấy yêu cầu hoàn tiền');

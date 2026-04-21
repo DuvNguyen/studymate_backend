@@ -41,7 +41,7 @@ export class EnrollmentsService {
     try {
       const enrollments = await this.enrollmentsRepo.find({
         where: { student_id: user.id },
-        relations: ['course', 'course.instructor', 'course.instructor.profile', 'order_item'],
+        relations: ['course', 'course.instructor', 'course.instructor.profile', 'order_item', 'refund_request'],
         order: { enrolled_at: 'DESC' },
       });
 
