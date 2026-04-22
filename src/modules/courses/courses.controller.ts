@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -11,6 +12,7 @@ import {
 } from './dto/course-response.dto';
 
 @Controller('courses')
+@UseInterceptors(CacheInterceptor)
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
@@ -20,6 +22,7 @@ export class CoursesController {
    * Query params: categorySlug, search, level, page, limit
    */
   @Get()
+  @CacheTTL(600 * 1000) // 10 minutes in ms
   async findAll(@Query() query: CourseQueryDto): Promise<PaginatedCoursesDto> {
     return this.coursesService.findPublicCourses(query);
   }
@@ -34,7 +37,9 @@ export class CoursesController {
    * Lấy chi tiết khóa học theo slug — public.
    */
   @Get(':slug')
+  @CacheTTL(60 * 1000) // 60 seconds in ms
   async findOne(@Param('slug') slug: string): Promise<CourseResponseDto> {
+    console.log(`[CoursesController] findOne called for slug: ${slug}`);
     return this.coursesService.findBySlug(slug);
   }
 

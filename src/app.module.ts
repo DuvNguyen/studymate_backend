@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { CacheModule, CacheInterceptor } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -16,8 +18,6 @@ import { CoursesModule } from './modules/courses/courses.module';
 import { VideosModule } from './modules/videos/videos.module';
 import { SectionsModule } from './modules/sections/sections.module';
 import { LessonsModule } from './modules/lessons/lessons.module';
-import { User } from './database/entities/user.entity';
-import { Role } from './database/entities/role.entity';
 import { CartsModule } from './modules/carts/carts.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
@@ -44,11 +44,22 @@ import { SearchModule } from './modules/search/search.module';
         url: config.get<string>('DATABASE_URL'),
         ssl: { rejectUnauthorized: false },
         autoLoadEntities: true,
-        synchronize: config.get('NODE_ENV') !== 'production',
+        synchronize: false, // Tạm thời tắt để tránh treo do Neon chậm
         logging: config.get('NODE_ENV') === 'development',
       }),
     }),
-
+    
+    CacheModule.registerAsync({
+      isGlobal: true,
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => ({
+        store: await redisStore({
+          url: `redis://${config.get<string>('REDIS_HOST', 'localhost')}:${config.get<string>('REDIS_PORT', '6379')}`,
+        }),
+        ttl: parseInt(config.get('REDIS_TTL', '3600'), 10) * 1000,
+      }),
+    }),
+    
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     ScheduleModule.forRoot(),
 
@@ -78,6 +89,7 @@ import { SearchModule } from './modules/search/search.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: CacheInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
