@@ -240,6 +240,38 @@ export class VideosService {
     return this.toDto(saved);
   }
 
+  async remove(id: number, userId: number, isAdmin: boolean): Promise<void> {
+    const video = await this.videosRepository.findOne({
+      where: { id },
+    });
+
+    if (!video) throw new NotFoundException('Video không tồn tại');
+
+    // Chỉ uploader hoặc admin mới được xóa
+    if (video.uploaderId !== userId && !isAdmin) {
+      throw new BadRequestException('Bạn không có quyền xóa video này');
+    }
+
+    // Xóa trên YouTube (nếu có youtubeVideoId)
+    if (video.youtubeVideoId) {
+      try {
+        await this.youtube.videos.delete({
+          id: video.youtubeVideoId,
+        });
+        this.logger.log(`Đã xóa video ${video.youtubeVideoId} trên YouTube`);
+      } catch (err: any) {
+        // Log lỗi nhưng không chặn việc xóa DB nếu YouTube lỗi (có thể video đã bị xóa trước đó)
+        this.logger.error(
+          `Lỗi khi xóa video ${video.youtubeVideoId} trên YouTube:`,
+          err.message,
+        );
+      }
+    }
+
+    await this.videosRepository.remove(video);
+    this.logger.log(`Đã xóa video record #${id} khỏi DB`);
+  }
+
   // ─── Auto Validation (Background Job) ──────────────────────────────────────
 
   /**

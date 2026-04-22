@@ -9,6 +9,7 @@ import {
   Get,
   Param,
   Query,
+  Delete,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -115,5 +116,15 @@ export class VideosController {
     @Body('reason') reason?: string,
   ): Promise<VideoResponseDto> {
     return this.videosService.reviewVideo(id, user.id, status, reason);
+  }
+
+  @Delete(':id')
+  @Roles('INSTRUCTOR', 'ADMIN')
+  async deleteVideo(
+    @Param('id') id: number,
+    @CurrentUser() user: User,
+  ): Promise<void> {
+    const isAdmin = user.role.roleName === 'ADMIN';
+    return this.videosService.remove(id, user.id, isAdmin);
   }
 }
