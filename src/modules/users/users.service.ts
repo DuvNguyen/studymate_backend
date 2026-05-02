@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
@@ -55,13 +57,23 @@ export class UsersService {
     private notificationsService: NotificationsService,
     @Inject(forwardRef(() => SearchService))
     private searchService: SearchService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async findOneByClerkId(clerkUserId: string): Promise<User | null> {
-    return this.userRepo.findOne({
+    const cacheKey = `user_clerk_${clerkUserId}`;
+    const cachedUser = await this.cacheManager.get<User>(cacheKey);
+    if (cachedUser) return cachedUser;
+
+    const user = await this.userRepo.findOne({
       where: { clerkUserId },
       relations: ['role'],
     });
+
+    if (user) {
+      await this.cacheManager.set(cacheKey, user, 300 * 1000); // 5 minutes
+    }
+    return user;
   }
 
   // ─── Profile (bản thân) ────────────────────────────────────────────────────
@@ -109,6 +121,10 @@ export class UsersService {
 
     await this.profileRepo.save(user.profile);
     await this.userRepo.save(user);
+
+    // Invalidate cache
+    await this.cacheManager.del(`user_clerk_${clerkUserId}`);
+    await this.cacheManager.del(`user_auth_${clerkUserId}`);
 
     // Sync to Meilisearch
     await this.searchService.indexUser(this.toSearchDocument(user));
@@ -359,6 +375,10 @@ export class UsersService {
         user.roleId = instructorRole.id;
         user.role = instructorRole;
         await this.userRepo.save(user);
+        
+        // Invalidate cache
+        await this.cacheManager.del(`user_clerk_${user.clerkUserId}`);
+        await this.cacheManager.del(`user_auth_${user.clerkUserId}`);
 
         // Sync cho Clerk SDK
         try {
@@ -580,6 +600,10 @@ export class UsersService {
     target.roleId = role.id;
     target.role = role;
     await this.userRepo.save(target);
+    
+    // Invalidate cache
+    await this.cacheManager.del(`user_clerk_${target.clerkUserId}`);
+    await this.cacheManager.del(`user_auth_${target.clerkUserId}`);
     return this.toPublicProfile(target);
   }
 
@@ -710,8 +734,12 @@ export class UsersService {
       // Vẫn tiếp tục thực hiện xóa local để đảm bảo đồng bộ
     }
 
-    // 2. Xóa trong CSDL Local (Soft delete - cập nhật status hoặc deleteDate)
+    // 2. Xóa trong CSDL Local (Soft delete)
     await this.userRepo.softDelete(id);
+
+    // Invalidate cache
+    await this.cacheManager.del(`user_clerk_${user.clerkUserId}`);
+    await this.cacheManager.del(`user_auth_${user.clerkUserId}`);
     return { id };
   }
 

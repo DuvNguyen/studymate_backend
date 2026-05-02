@@ -5,6 +5,7 @@ import { Course, CourseStatus, CourseLevel } from '../../database/entities/cours
 import { Category } from '../../database/entities/category.entity';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
+import { User } from '../../database/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SearchService } from '../search/search.service';
 import { NotificationType } from '../../database/entities/notification.entity';
@@ -334,9 +335,10 @@ export class CoursesService {
   async findCourseForLearn(
     userId: number,
     slug: string,
+    user?: User,
   ): Promise<CourseResponseDto> {
     let course = await this.coursesRepository.findOne({
-      where: { slug, status: CourseStatus.PUBLISHED },
+      where: { slug },
       relations: [
         'instructor',
         'instructor.profile',
@@ -359,7 +361,6 @@ export class CoursesService {
         .leftJoinAndSelect('lessons.video', 'video')
         .leftJoinAndSelect('course.quizzes', 'quizzes')
         .where('course.slug LIKE :slug', { slug: `${slug}%` })
-        .andWhere('course.status = :status', { status: CourseStatus.PUBLISHED })
         .getOne();
     }
 
@@ -367,18 +368,29 @@ export class CoursesService {
       throw new NotFoundException(`Course "${slug}" không tồn tại`);
     }
 
-    // Verify enrollment
-    const isEnrolled = await this.coursesRepository.manager.findOne(
-      'Enrollment',
-      {
-        where: { student_id: userId, course_id: course.id, is_active: true },
-      },
-    );
+    // Bypass enrollment check if ADMIN or INSTRUCTOR of the course
+    const isAdmin = user?.role?.roleName === 'ADMIN';
+    const isOwner = course.instructor?.id === userId;
 
-    if (!isEnrolled) {
-      throw new ForbiddenException(
-        'Bạn không có quyền truy cập học liệu của khóa học này',
+    // If not published, only owner and admin can see
+    if (course.status !== CourseStatus.PUBLISHED && !isAdmin && !isOwner) {
+      throw new ForbiddenException('Khóa học này hiện chưa được công khai');
+    }
+
+    if (!isAdmin && !isOwner) {
+      // Verify enrollment
+      const isEnrolled = await this.coursesRepository.manager.findOne(
+        'Enrollment',
+        {
+          where: { student_id: userId, course_id: course.id, is_active: true },
+        },
       );
+
+      if (!isEnrolled) {
+        throw new ForbiddenException(
+          'Bạn không có quyền truy cập học liệu của khóa học này',
+        );
+      }
     }
 
     return this.toDto(course, true);

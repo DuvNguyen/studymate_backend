@@ -22,6 +22,20 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @UseGuards(ClerkAuthGuard, RolesGuard)
 export class DiscussionsController {
   constructor(private readonly discussionsService: DiscussionsService) {}
+  
+  @Get('instructor')
+  @Roles('INSTRUCTOR')
+  async getInstructor(
+    @CurrentUser() user: User,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.discussionsService.getInstructorDiscussions(
+      user,
+      page ? Number(page) : undefined,
+      limit ? Number(limit) : undefined,
+    );
+  }
 
   @Post()
   async create(@CurrentUser() user: User, @Body() dto: CreateDiscussionDto) {
@@ -29,14 +43,23 @@ export class DiscussionsController {
   }
 
   @Get('lesson/:lessonId')
-  async getLesson(@Param('lessonId') lessonId: number) {
-    return this.discussionsService.getLessonDiscussions(lessonId);
+  async getLesson(@CurrentUser() user: User, @Param('lessonId') lessonId: number) {
+    return this.discussionsService.getLessonDiscussions(lessonId, user);
   }
 
   @Patch(':id/best-answer')
-  @Roles('INSTRUCTOR', 'STAFF', 'ADMIN')
+  @Roles('INSTRUCTOR')
   async markBestAnswer(@CurrentUser() user: User, @Param('id') id: number) {
     return this.discussionsService.markBestAnswer(id, user);
+  }
+
+  @Post(':id/vote')
+  async voteDiscussion(
+    @CurrentUser() user: User,
+    @Param('id') id: number,
+    @Body('value') value: number,
+  ) {
+    return this.discussionsService.voteDiscussion(id, value, user);
   }
 
   @Delete(':id')

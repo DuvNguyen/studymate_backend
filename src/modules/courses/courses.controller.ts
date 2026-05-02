@@ -28,6 +28,7 @@ export class CoursesController {
   }
 
   @Get('suggest')
+  @CacheTTL(300 * 1000) // 5 minutes in ms
   async suggest(@Query('q') q: string) {
     return this.coursesService.suggestCourses(q);
   }
@@ -53,6 +54,6 @@ export class CoursesController {
     @CurrentUser() user: User,
     @Param('slug') slug: string,
   ): Promise<CourseResponseDto> {
-    return this.coursesService.findCourseForLearn(user.id, slug);
+    return this.coursesService.findCourseForLearn(user.id, slug, user);
   }
 }

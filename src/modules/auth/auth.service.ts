@@ -1,4 +1,6 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
@@ -24,14 +26,25 @@ export class AuthService {
 
     @InjectRepository(Profile)
     private profileRepo: Repository<Profile>,
+
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
   ) {}
 
   // Lấy user từ DB dựa theo clerkUserId (đã được verify bởi guard)
   async getUserByClerkId(clerkUserId: string): Promise<User> {
+    const cacheKey = `user_auth_${clerkUserId}`;
+    const cached = await this.cacheManager.get<User>(cacheKey);
+    if (cached) return cached;
+
     const user = await this.userRepo.findOne({
       where: { clerkUserId },
       relations: ['role', 'instructorProfile', 'profile'],
     });
+
+    if (user) {
+      await this.cacheManager.set(cacheKey, user, 300 * 1000); // 5 minutes
+    }
 
     if (!user) {
       throw new UnauthorizedException(

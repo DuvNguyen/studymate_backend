@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res, UseInterceptors } from '@nestjs/common';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { StatisticsService } from './statistics.service';
 import { ExportService } from './export.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
@@ -9,6 +10,7 @@ import * as express from 'express';
 @Controller('statistics')
 @UseGuards(ClerkAuthGuard, RolesGuard)
 @Roles('ADMIN', 'STAFF')
+@UseInterceptors(CacheInterceptor)
 export class StatisticsController {
   constructor(
     private readonly statisticsService: StatisticsService,
@@ -21,6 +23,7 @@ export class StatisticsController {
   }
 
   @Get('dashboard')
+  @CacheTTL(300 * 1000) // 5 minutes
   async getDashboard(
     @Query('startDate') startDate?: string, 
     @Query('endDate') endDate?: string
@@ -30,6 +33,7 @@ export class StatisticsController {
   }
 
   @Get('revenue-chart')
+  @CacheTTL(300 * 1000) // 5 minutes
   async getRevenueChart(
     @Query('startDate') startDate?: string, 
     @Query('endDate') endDate?: string,

@@ -44,6 +44,12 @@ export class LessonDiscussion {
   @Column({ type: 'text' })
   content: string;
 
+  @Column({ default: 0 })
+  upvotes: number;
+
+  @Column({ default: 0 })
+  downvotes: number;
+
   @Column({ default: false })
   is_best_answer: boolean;
 
