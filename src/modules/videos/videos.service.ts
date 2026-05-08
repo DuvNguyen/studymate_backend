@@ -300,7 +300,6 @@ export class VideosService {
   async autoValidateVideos() {
     if (this.isCronRunning) return;
 
-    // Kiểm tra nhanh qua Cache xem có video nào cần xử lý không
     const hasWork = await this.cacheManager.get<boolean>('has_processing_videos');
     if (hasWork === false) return;
 

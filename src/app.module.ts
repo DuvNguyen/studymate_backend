@@ -39,14 +39,28 @@ import { SearchModule } from './modules/search/search.module';
 
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        url: config.get<string>('DATABASE_URL'),
-        ssl: { rejectUnauthorized: false },
-        autoLoadEntities: true,
-        synchronize: false, // Tạm thời tắt để tránh treo do Neon chậm
-        logging: config.get('NODE_ENV') === 'development',
-      }),
+      useFactory: (config: ConfigService) => {
+        const dbUrl = config.get<string>('DATABASE_URL') || '';
+        const host = dbUrl.split('@')[1]?.split('/')[0] || 'unknown';
+        console.log(`[Database] Connecting to: ${host}`);
+        
+        return {
+          type: 'postgres',
+          url: dbUrl,
+          ssl: true,
+          autoLoadEntities: true,
+          synchronize: false,
+          logging: config.get('NODE_ENV') === 'development',
+          extra: {
+            ssl: {
+              rejectUnauthorized: false,
+            },
+            max: 10,
+            connectionTimeoutMillis: 30000, 
+            idleTimeoutMillis: 30000,
+          },
+        };
+      },
     }),
     
     CacheModule.registerAsync({
