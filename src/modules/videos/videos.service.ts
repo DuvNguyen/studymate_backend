@@ -4,7 +4,10 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -24,11 +27,13 @@ import {
 export class VideosService {
   private readonly logger = new Logger(VideosService.name);
   private youtube: youtube_v3.Youtube;
+  private isCronRunning = false;
 
   constructor(
     @InjectRepository(Video)
     private readonly videosRepository: Repository<Video>,
     private readonly configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     // Khởi tạo OAuth2 client với credentials từ .env
     const oauth2Client = new google.auth.OAuth2(
@@ -108,6 +113,9 @@ export class VideosService {
 
     const saved = await this.videosRepository.save(video);
     this.logger.log(`Đã lưu Video record vào DB. ID: ${saved.id}`);
+
+    // Đánh dấu có video cần xử lý trong background
+    await this.cacheManager.set('has_processing_videos', true, 0); // 0 = no TTL, permanent until reset
 
     return this.toDto(saved);
   }
@@ -240,6 +248,38 @@ export class VideosService {
     return this.toDto(saved);
   }
 
+  async remove(id: number, userId: number, isAdmin: boolean): Promise<void> {
+    const video = await this.videosRepository.findOne({
+      where: { id },
+    });
+
+    if (!video) throw new NotFoundException('Video không tồn tại');
+
+    // Chỉ uploader hoặc admin mới được xóa
+    if (video.uploaderId !== userId && !isAdmin) {
+      throw new BadRequestException('Bạn không có quyền xóa video này');
+    }
+
+    // Xóa trên YouTube (nếu có youtubeVideoId)
+    if (video.youtubeVideoId) {
+      try {
+        await this.youtube.videos.delete({
+          id: video.youtubeVideoId,
+        });
+        this.logger.log(`Đã xóa video ${video.youtubeVideoId} trên YouTube`);
+      } catch (err: any) {
+        // Log lỗi nhưng không chặn việc xóa DB nếu YouTube lỗi (có thể video đã bị xóa trước đó)
+        this.logger.error(
+          `Lỗi khi xóa video ${video.youtubeVideoId} trên YouTube:`,
+          err.message,
+        );
+      }
+    }
+
+    await this.videosRepository.remove(video);
+    this.logger.log(`Đã xóa video record #${id} khỏi DB`);
+  }
+
   // ─── Auto Validation (Background Job) ──────────────────────────────────────
 
   /**
@@ -258,15 +298,26 @@ export class VideosService {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async autoValidateVideos() {
-    const pendingVideos = await this.videosRepository.find({
-      where: { status: VideoStatus.PROCESSING },
-    });
+    if (this.isCronRunning) return;
 
-    if (pendingVideos.length === 0) return;
+    const hasWork = await this.cacheManager.get<boolean>('has_processing_videos');
+    if (hasWork === false) return;
 
-    this.logger.log(
-      `Tự động kiểm tra ${pendingVideos.length} video đang PROCESSING (Auto-Validation)...`,
-    );
+    this.isCronRunning = true;
+    try {
+      const pendingVideos = await this.videosRepository.find({
+        where: { status: VideoStatus.PROCESSING },
+      });
+
+      if (pendingVideos.length === 0) {
+        // Không còn việc, đánh dấu vào cache để lần sau không check DB nữa
+        await this.cacheManager.set('has_processing_videos', false, 0);
+        return;
+      }
+
+      this.logger.log(
+        `Tự động kiểm tra ${pendingVideos.length} video đang PROCESSING (Auto-Validation)...`,
+      );
 
     for (const video of pendingVideos) {
       if (!video.youtubeVideoId) continue;
@@ -329,6 +380,9 @@ export class VideosService {
           err.message,
         );
       }
+    }
+    } finally {
+      this.isCronRunning = false;
     }
   }
 }

@@ -11,7 +11,11 @@ import { Response } from 'express';
 // { success: false, statusCode: ..., message: '...' }
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
+  catch(exception: any, host: ArgumentsHost) {
+    console.error('--- HỆ THỐNG GẶP LỖI ---');
+    console.error(exception);
+    if (exception?.stack) console.error(exception.stack);
+    console.error('------------------------');
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 

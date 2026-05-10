@@ -58,6 +58,18 @@ export class Quiz {
   @Column({ type: 'boolean', name: 'is_final', default: false })
   isFinal: boolean;
 
+  @Column({ type: 'varchar', nullable: true })
+  difficulty: string | null;
+
+  @Column({ type: 'int', name: 'num_easy', default: 0 })
+  numEasy: number;
+
+  @Column({ type: 'int', name: 'num_medium', default: 0 })
+  numMedium: number;
+
+  @Column({ type: 'int', name: 'num_hard', default: 0 })
+  numHard: number;
+
   @Column({ type: 'boolean', name: 'is_active', default: true })
   isActive: boolean;
 

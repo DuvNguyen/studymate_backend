@@ -12,7 +12,7 @@ import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 
-@Controller('api/v1/coupons')
+@Controller('coupons')
 export class CouponsController {
   constructor(private readonly couponsService: CouponsService) {}
 

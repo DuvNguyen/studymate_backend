@@ -13,7 +13,11 @@ For any task involving code understanding, debugging, impact analysis, or refact
 
 1. **Read `gitnexus://repo/{name}/context`** — codebase overview + check index freshness
 2. **Match your task to a skill below** and **read that skill file**
-3. **Follow the skill's workflow and checklist**
+3. **Follow the Standard GitNexus Workflow (SOP)**:
+    - **A. Context Gathering**: Use `gitnexus_context` on the target symbol and `gitnexus_query` to understand the execution flow.
+    - **B. Impact Analysis**: Run `gitnexus_impact` BEFORE editing. Report HIGH/CRITICAL risk results to the user.
+    - **C. Implementation**: Apply changes.
+    - **D. Verification**: Run `gitnexus_detect_changes()` to ensure zero unintended side effects.
 
 > If step 1 warns the index is stale, run `npx gitnexus analyze` in the terminal first.
 

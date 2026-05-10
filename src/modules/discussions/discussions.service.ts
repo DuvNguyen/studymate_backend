@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, TreeRepository, Like } from 'typeorm';
 import { LessonDiscussion } from '../../database/entities/lesson-discussion.entity';
+import { DiscussionVote } from '../../database/entities/discussion-vote.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
 import { User } from '../../database/entities/user.entity';
 import { CreateDiscussionDto } from './dto/create-discussion-request.dto';
@@ -23,8 +24,14 @@ export class DiscussionsService {
   constructor(
     @InjectRepository(LessonDiscussion)
     private readonly discussionsRepo: TreeRepository<LessonDiscussion>,
+    @InjectRepository(DiscussionVote)
+    private readonly discussionVotesRepo: Repository<DiscussionVote>,
     @InjectRepository(Enrollment)
     private readonly enrollmentsRepo: Repository<Enrollment>,
+    @InjectRepository(Course)
+    private readonly coursesRepo: Repository<Course>,
+    @InjectRepository(Lesson)
+    private readonly lessonsRepo: Repository<Lesson>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -109,10 +116,11 @@ export class DiscussionsService {
     try {
       const authorName = user.profile?.fullName || user.email?.split('@')[0] || 'Người dùng';
 
-      // If it's a reply, notify the parent comment author
+      // 1. If it's a reply, notify the parent comment author
       if (dto.parentId) {
         const parent = await this.discussionsRepo.findOne({
           where: { id: dto.parentId },
+          relations: ['user'],
         });
         if (parent && parent.user_id !== user.id) {
           await this.notificationsService.sendNotification(
@@ -120,6 +128,23 @@ export class DiscussionsService {
             NotificationType.COMMUNITY,
             'Trả lời mới!',
             `${authorName} đã trả lời bình luận của bạn. Xem ngay!`,
+            { discussionId: discussion.id, lessonId: dto.lessonId, courseId: dto.courseId },
+          );
+        }
+      } 
+      // 2. If it's a NEW question (root), notify the instructor
+      else {
+        const course = await this.coursesRepo.findOne({ 
+          where: { id: dto.courseId },
+          relations: ['instructor'],
+        });
+        
+        if (course && course.instructorId !== user.id) {
+          await this.notificationsService.sendNotification(
+            course.instructorId,
+            NotificationType.COMMUNITY,
+            'Câu hỏi mới từ học viên!',
+            `${authorName} đã đặt một câu hỏi mới trong khóa học "${course.title}".`,
             { discussionId: discussion.id, lessonId: dto.lessonId, courseId: dto.courseId },
           );
         }
@@ -132,6 +157,7 @@ export class DiscussionsService {
 
   async getLessonDiscussions(
     lessonId: number,
+    user: User,
   ): Promise<DiscussionResponseDto[]> {
     interface DiscussionTree extends LessonDiscussion {
       children: DiscussionTree[];
@@ -143,6 +169,16 @@ export class DiscussionsService {
 
     const lessonRoots = roots.filter((r) => r.lesson_id === lessonId);
 
+    // Fetch all votes of the current user for discussions in this lesson
+    // We can just fetch all votes by this user and filter by the fetched discussion IDs
+    const userVotes = await this.discussionVotesRepo.find({
+      where: { user_id: user.id },
+    });
+    const voteMap = new Map<number, number>();
+    for (const v of userVotes) {
+      voteMap.set(v.discussion_id, v.value);
+    }
+
     const results: DiscussionTree[] = [];
     for (const root of lessonRoots) {
       const tree = await this.discussionsRepo.findDescendantsTree(root, {
@@ -151,7 +187,7 @@ export class DiscussionsService {
       results.push(tree as DiscussionTree);
     }
 
-    return results.map((t) => this.mapToDto(t));
+    return results.map((t) => this.mapToDto(t, voteMap));
   }
 
   async markBestAnswer(id: number, user: User) {
@@ -162,19 +198,62 @@ export class DiscussionsService {
 
     if (!discussion) throw new NotFoundException('Không tìm thấy thảo luận');
 
-    // Only instructor, staff or admin can mark best answer
-    const isAdminOrStaff = [RoleName.ADMIN, RoleName.STAFF].includes(
-      user.role.roleName as RoleName,
-    );
-    const isInstructor = discussion.user_id === user.id; // Or check if instructor of this course
-
-    // Simplified check: only check role for now
-    if (!isAdminOrStaff && user.role.roleName !== RoleName.INSTRUCTOR) {
-      throw new ForbiddenException('Bạn không có quyền thực hiện hành động này');
+    // Only instructor can mark best answer
+    if (user.role.roleName !== RoleName.INSTRUCTOR) {
+      throw new ForbiddenException('Chỉ có Giảng viên mới được đánh dấu câu trả lời đúng');
     }
 
     discussion.is_best_answer = !discussion.is_best_answer;
     return this.discussionsRepo.save(discussion);
+  }
+
+  async voteDiscussion(id: number, value: number, user: User) {
+    if (![1, -1, 0].includes(value)) {
+      throw new BadRequestException('Giá trị vote không hợp lệ');
+    }
+
+    const discussion = await this.discussionsRepo.findOne({ where: { id } });
+    if (!discussion) throw new NotFoundException('Không tìm thấy thảo luận');
+    if (discussion.is_deleted) throw new BadRequestException('Không thể vote bình luận đã xóa');
+
+    let vote = await this.discussionVotesRepo.findOne({
+      where: { discussion_id: id, user_id: user.id },
+    });
+
+    const oldValue = vote ? vote.value : 0;
+
+    if (value === 0) {
+      if (vote) {
+        await this.discussionVotesRepo.remove(vote);
+      }
+    } else {
+      if (vote) {
+        vote.value = value;
+        await this.discussionVotesRepo.save(vote);
+      } else {
+        vote = this.discussionVotesRepo.create({
+          discussion_id: id,
+          user_id: user.id,
+          value,
+        });
+        await this.discussionVotesRepo.save(vote);
+      }
+    }
+
+    // Update discussion counters
+    if (oldValue === 1) discussion.upvotes -= 1;
+    if (oldValue === -1) discussion.downvotes -= 1;
+
+    if (value === 1) discussion.upvotes += 1;
+    if (value === -1) discussion.downvotes += 1;
+
+    // Prevent negative counts just in case
+    discussion.upvotes = Math.max(0, discussion.upvotes);
+    discussion.downvotes = Math.max(0, discussion.downvotes);
+
+    await this.discussionsRepo.save(discussion);
+
+    return { upvotes: discussion.upvotes, downvotes: discussion.downvotes, userVote: value };
   }
 
   async softDelete(id: number, user: User) {
@@ -219,6 +298,47 @@ export class DiscussionsService {
     return this.discussionsRepo.save(discussion);
   }
 
+  async getInstructorDiscussions(
+    user: User,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    const qb = this.discussionsRepo.createQueryBuilder('d')
+      .innerJoinAndSelect('d.course', 'course')
+      .innerJoinAndSelect('d.lesson', 'lesson')
+      .leftJoinAndSelect('d.user', 'user')
+      .leftJoinAndSelect('user.profile', 'profile')
+      .leftJoinAndSelect('user.role', 'role')
+      .where('course.instructorId = :instructorId', { instructorId: user.id })
+      .andWhere('d.parent_id IS NULL')
+      .orderBy('d.created_at', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [roots, total] = await qb.getManyAndCount();
+
+    // Map to DTOs
+    const results = await Promise.all(
+      roots.map(async (root) => {
+        // Load tree for each root to get replies
+        const tree = await this.discussionsRepo.findDescendantsTree(root, {
+          relations: ['user', 'user.profile', 'user.role'],
+        });
+        return this.mapToDto(tree, new Map());
+      }),
+    );
+
+    return {
+      data: results,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   async search(
     courseId: number,
     keyword: string,
@@ -232,10 +352,10 @@ export class DiscussionsService {
       order: { created_at: 'DESC' },
     });
 
-    return discussions.map((d) => this.mapToDto(d));
+    return discussions.map((d) => this.mapToDto(d, new Map()));
   }
 
-  private mapToDto(d: LessonDiscussion): DiscussionResponseDto {
+  private mapToDto(d: LessonDiscussion, voteMap: Map<number, number>): DiscussionResponseDto {
     const content = d.is_deleted ? '_Bình luận không có sẵn_' : d.content;
     const fullName = d.is_deleted
       ? '[Người dùng đã xóa]'
@@ -244,13 +364,25 @@ export class DiscussionsService {
     return plainToInstance(DiscussionResponseDto, {
       ...d,
       content,
+      upvotes: d.upvotes || 0,
+      downvotes: d.downvotes || 0,
+      userVote: voteMap.get(d.id) || 0,
+      course: d.course ? {
+        id: d.course.id,
+        title: d.course.title,
+        slug: d.course.slug,
+      } : undefined,
+      lesson: d.lesson ? {
+        id: d.lesson.id,
+        title: d.lesson.title,
+      } : undefined,
       user: {
         id: d.user?.id,
         fullName,
         avatarUrl: d.is_deleted ? null : d.user?.avatarUrl,
         role: { roleName: d.user?.role?.roleName || 'STUDENT' },
       },
-      children: d.children ? d.children.map((c) => this.mapToDto(c)) : [],
+      children: d.children ? d.children.map((c) => this.mapToDto(c, voteMap)) : [],
     });
   }
 }

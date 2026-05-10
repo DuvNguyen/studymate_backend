@@ -28,17 +28,17 @@ export class QuizzesController {
     return this.quizzesService.getQuizzesByCourse(courseId);
   }
 
-  @Get('quizzes/:id')
-  async getQuizDetail(@Param('id', ParseIntPipe) id: number) {
-    return this.quizzesService.getQuiz(id);
-  }
-
   @Get('quizzes/:id/attempts')
   async getMyAttempts(
     @CurrentUser() user: User,
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.quizzesService.getUserAttempts(id, user.id);
+  }
+
+  @Get('quizzes/:id')
+  async getQuizDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.quizzesService.getQuiz(id);
   }
 
   @Post('quizzes/:id/start')
@@ -56,6 +56,13 @@ export class QuizzesController {
     @Body() answers: any,
   ) {
     return this.quizzesService.submitAttempt(attemptId, user.id, answers);
+  }
+  @Get('quizzes/attempts/:attemptId')
+  async getAttempt(
+    @CurrentUser() user: User,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+  ) {
+    return this.quizzesService.getAttemptDetail(attemptId, user.id);
   }
 
   // ── Instructor Endpoints ─────────────────────────────────────
