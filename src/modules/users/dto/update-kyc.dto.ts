@@ -9,6 +9,9 @@ import { Type } from 'class-transformer';
 import { DocumentType } from '../../../database/entities/instructor-document.entity';
 
 export class InstructorDocumentDto {
+  @IsOptional()
+  id?: number;
+
   @IsEnum(DocumentType)
   documentType: DocumentType;
 
@@ -17,6 +20,18 @@ export class InstructorDocumentDto {
 
   @IsString()
   fileUrl: string;
+}
+
+export class CertificateDto {
+  @IsOptional()
+  id?: number;
+
+  @IsString()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  fileUrl?: string;
 }
 
 export class UpdateKycDto {
@@ -44,5 +59,7 @@ export class UpdateKycDto {
 
   @IsOptional()
   @IsArray()
-  certificates?: any[];
+  @ValidateNested({ each: true })
+  @Type(() => CertificateDto)
+  certificates?: CertificateDto[];
 }

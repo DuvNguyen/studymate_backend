@@ -1,8 +1,10 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseInterceptors } from '@nestjs/common';
+import { CacheInterceptor, CacheKey, CacheTTL } from '@nestjs/cache-manager';
 import { CategoriesService } from './categories.service';
 import { CategoryResponseDto } from './dto/category-response.dto';
 
 @Controller('categories')
+@UseInterceptors(CacheInterceptor)
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
@@ -11,6 +13,8 @@ export class CategoriesController {
    * Public — trả danh sách root categories kèm children.
    */
   @Get()
+  @CacheKey('categories_tree')
+  @CacheTTL(86400 * 1000) // 24 hours in ms
   async getTree(): Promise<CategoryResponseDto[]> {
     return this.categoriesService.getTree();
   }

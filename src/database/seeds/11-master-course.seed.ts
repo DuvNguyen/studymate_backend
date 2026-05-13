@@ -45,6 +45,11 @@ export async function seedMasterCourse(dataSource: DataSource) {
     console.log(`  Tạo khóa học Master: ${course.title}`);
   } else {
     console.log('  Khóa học Master đã tồn tại.');
+    if (course.instructorId !== instructorId) {
+      course.instructorId = instructorId;
+      await courseRepo.save(course);
+      console.log(`  Đã cập nhật Instructor ID thành ${instructorId}.`);
+    }
   }
 
   // 3. Xóa dữ liệu cũ của khóa học này để seed lại sạch sẽ (nếu cần)

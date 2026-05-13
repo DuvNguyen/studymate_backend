@@ -64,4 +64,7 @@ export class Enrollment {
 
   @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
   completed_at: Date | null;
+
+  @OneToOne('RefundRequest', (refund: any) => refund.enrollment)
+  refund_request: any;
 }

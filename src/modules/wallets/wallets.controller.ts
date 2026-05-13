@@ -36,9 +36,13 @@ export class WalletsController {
   }
 
   @Get('me/transactions')
-  @Roles('INSTRUCTOR', 'STUDENT', 'STAFF', 'ADMIN')
-  getTransactions(@CurrentUser() user: User) {
-    return this.walletsService.getTransactionHistory(user.id);
+  @Roles('INSTRUCTOR', 'STUDENT')
+  getMyTransactions(
+    @CurrentUser('id') userId: number,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.walletsService.getTransactionHistory(userId, Number(page), Number(limit));
   }
 
   @Get('me/payouts')
@@ -78,6 +82,18 @@ export class WalletsController {
       `attachment; filename=studymate_payouts_${Date.now()}.xlsx`,
     );
     res.end(buffer);
+  }
+
+  @Post('payouts/export-csv')
+  @Roles('ADMIN', 'STAFF')
+  async exportPayoutsCsv(@Body() body: { ids: number[] }, @Res() res: Response) {
+    const csv = await this.walletsService.exportPayoutsCsv(body.ids);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=studymate_payouts_${Date.now()}.csv`,
+    );
+    res.end(csv);
   }
 
   @Post('payouts/reconcile')

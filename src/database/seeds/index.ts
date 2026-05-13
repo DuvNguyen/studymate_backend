@@ -29,10 +29,13 @@ import { Wishlist } from '../entities/wishlist.entity';
 import { Quiz } from '../entities/quiz.entity';
 import { QuizAttempt } from '../entities/quiz-attempt.entity';
 import { Payout } from '../entities/payout.entity';
+import { Review } from '../entities/review.entity';
 
 import { seedRoles } from './01-roles.seed';
 import { seedUsers } from './02-users.seed';
 import { seedCategories } from './03-categories.seed';
+import { seedTransactions } from './07-transactions.seed';
+import { seedQuestionBanks } from './09-question-banks.seed';
 import { seedMasterCourse } from './11-master-course.seed';
 
 // Khởi tạo kết nối DB trực tiếp — không qua NestJS
@@ -70,6 +73,7 @@ const dataSource = new DataSource({
     Quiz,
     QuizAttempt,
     Payout,
+    Review,
   ],
   synchronize: false, // Tắt synchronize để tránh lỗi drop/alter table
 });
@@ -88,6 +92,12 @@ async function runSeeds() {
 
   console.log('\n2. Khởi tạo KHÓA HỌC MASTER (Linux Ubuntu)...');
   await seedMasterCourse(dataSource);
+
+  console.log('\n3. Khởi tạo NGÂN HÀNG CÂU HỎI từ CSV...');
+  await seedQuestionBanks(dataSource);
+
+  console.log('\n4. Khởi tạo GIAO DỊCH (Transaction) cho Ledger...');
+  await seedTransactions(dataSource);
 
   await dataSource.destroy();
 

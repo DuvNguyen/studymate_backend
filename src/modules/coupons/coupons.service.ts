@@ -14,6 +14,15 @@ export class CouponsService {
   ) {}
 
   async create(data: Partial<Coupon>, instructor: User) {
+    // ── Unique code check ──────────────────────────────────────
+    const existing = await this.couponsRepo.findOne({
+      where: { code: data.code },
+    });
+    if (existing) {
+      throw new BadRequestException('Mã giảm giá này đã tồn tại trong hệ thống. Vui lòng chọn tên khác.');
+    }
+    // ────────────────────────────────────────────────────────────
+
     // ── Monthly limit check ──────────────────────────────────────
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);

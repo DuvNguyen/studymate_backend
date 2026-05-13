@@ -4,9 +4,10 @@ import { User } from '../../database/entities/user.entity';
 // Dùng trong controller để lấy user hiện tại
 // Ví dụ: @Get('me') getMe(@CurrentUser() user: User) { ... }
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): User => {
+  (data: string, ctx: ExecutionContext): any => {
     const request = ctx.switchToHttp().getRequest();
-    return request.user;
+    const user = request.user;
+    return data ? user?.[data] : user;
   },
 );
 

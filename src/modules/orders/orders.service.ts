@@ -76,6 +76,7 @@ export class OrdersService {
         discount_amount: totalDiscount,
         total_amount: subtotal - totalDiscount,
         status: OrderStatus.PENDING,
+        coupon_id: appliedCoupon?.id || null,
       });
       await queryRunner.manager.save(order);
 
@@ -112,12 +113,7 @@ export class OrdersService {
         totalAmount += price;
       }
 
-      // If coupon was used, increment its count
-      if (appliedCoupon) {
-        await this.couponsService.incrementUsedCount(appliedCoupon.id);
-      }
-
-      // Finalize order totals (already set in create, but double checking)
+      // Xóa item trong cart
       order.total_amount = totalAmount - totalDiscount;
       await queryRunner.manager.save(order);
 
@@ -256,6 +252,11 @@ export class OrdersService {
           status: 'COMPLETED',
           balance_after: 0, // Students don't track balance in this context
         }));
+      }
+
+      // ── NEW: Update Coupon Usage Count upon payment completion ──
+      if (order.coupon_id) {
+        await this.couponsService.incrementUsedCount(order.coupon_id);
       }
 
       await queryRunner.commitTransaction();

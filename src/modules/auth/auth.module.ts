@@ -5,12 +5,13 @@ import { AuthService } from './auth.service';
 import { User } from '../../database/entities/user.entity';
 import { Role } from '../../database/entities/role.entity';
 import { InstructorProfile } from '../../database/entities/instructor-profile.entity';
+import { Profile } from '../../database/entities/profile.entity';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Role, InstructorProfile])],
+  imports: [TypeOrmModule.forFeature([User, Role, InstructorProfile, Profile])],
   controllers: [AuthController],
   providers: [AuthService, ClerkAuthGuard, RolesGuard],
   exports: [AuthService, ClerkAuthGuard, RolesGuard], // export để module khác dùng
