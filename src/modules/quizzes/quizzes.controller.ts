@@ -18,7 +18,7 @@ import { User } from '../../database/entities/user.entity';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { QuestionBank } from '../../database/entities/question-bank.entity';
 import { QuestionBankQuestion } from '../../database/entities/question-bank-question.entity';
-import { SubmitAnswersPayload } from './quizzes.service';
+import type { SubmitAnswersPayload } from './quizzes.service';
 
 @Controller()
 @UseGuards(ClerkAuthGuard, RolesGuard)
