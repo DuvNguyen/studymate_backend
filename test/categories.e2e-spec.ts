@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import type { Server } from 'http';
 import { AppModule } from './../src/app.module';
 
 describe('Categories (e2e)', () => {
@@ -20,10 +21,11 @@ describe('Categories (e2e)', () => {
   });
 
   it('/api/v1/categories (GET)', () => {
-    return request(app.getHttpServer())
+    const server = app.getHttpServer() as unknown as Server;
+    return request(server)
       .get('/api/v1/categories')
       .expect(200)
-      .then(response => {
+      .then((response) => {
         expect(Array.isArray(response.body)).toBe(true);
       });
   });

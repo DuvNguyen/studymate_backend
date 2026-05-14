@@ -7,15 +7,13 @@ import * as express from 'express';
 
 @Injectable()
 export class ExportService {
-  constructor(
-    @InjectRepository(Order) private orderRepo: Repository<Order>
-  ) {}
+  constructor(@InjectRepository(Order) private orderRepo: Repository<Order>) {}
 
   async exportRevenueToExcel(res: express.Response) {
     const orders = await this.orderRepo.find({
       where: { status: OrderStatus.COMPLETED },
       relations: ['student'],
-      order: { created_at: 'DESC' }
+      order: { created_at: 'DESC' },
     });
 
     const workbook = new ExcelJS.Workbook();
@@ -30,23 +28,33 @@ export class ExportService {
       { header: 'Thành Tiền ($)', key: 'total', width: 15 },
     ];
 
-    orders.forEach(order => {
+    orders.forEach((order) => {
       sheet.addRow({
         order_number: order.order_number,
         created_at: order.created_at.toISOString(),
         student: order.student?.email || 'N/A',
         subtotal: order.subtotal,
         discount: order.discount_amount,
-        total: order.total_amount
+        total: order.total_amount,
       });
     });
 
     // Styling
     sheet.getRow(1).font = { bold: true };
-    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD600' } };
+    sheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFD600' },
+    };
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=bao_cao_doanh_thu.xlsx');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=bao_cao_doanh_thu.xlsx',
+    );
 
     await workbook.xlsx.write(res);
     res.end();

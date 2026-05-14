@@ -11,13 +11,37 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Webhook } from 'svix';
 import type { Request } from 'express';
-import { User } from '../database/entities/user.entity';
+import { User, UserStatus } from '../database/entities/user.entity';
 import { Role } from '../database/entities/role.entity';
 import { Profile } from '../database/entities/profile.entity';
 import {
   InstructorProfile,
   KycStatus,
 } from '../database/entities/instructor-profile.entity';
+
+interface RawBodyRequest extends Request {
+  rawBody?: string | Buffer;
+}
+
+interface ClerkEmailAddress {
+  email_address?: string;
+}
+
+interface ClerkWebhookData {
+  id: string;
+  email_addresses?: ClerkEmailAddress[];
+  image_url?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  public_metadata?: {
+    role?: string;
+  };
+}
+
+interface ClerkWebhookPayload {
+  type: string;
+  data: ClerkWebhookData;
+}
 
 @Controller('webhooks')
 export class ClerkWebhookController {
@@ -42,7 +66,7 @@ export class ClerkWebhookController {
     @Headers('svix-id') svixId: string,
     @Headers('svix-timestamp') svixTimestamp: string,
     @Headers('svix-signature') svixSignature: string,
-    @Req() req: Request,
+    @Req() req: RawBodyRequest,
   ) {
     const webhookSecret = this.config.get<string>('CLERK_WEBHOOK_SECRET');
 
@@ -54,14 +78,19 @@ export class ClerkWebhookController {
 
     // Xác minh chữ ký webhook từ Clerk
     const wh = new Webhook(webhookSecret);
-    let payload: any;
+    let payload: ClerkWebhookPayload;
 
     try {
-      payload = wh.verify((req as any).rawBody, {
+      const rawPayload = req.rawBody;
+      if (!rawPayload) {
+        throw new BadRequestException('Thiếu rawBody để xác thực webhook');
+      }
+      const verified = wh.verify(rawPayload, {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,
         'svix-signature': svixSignature,
       });
+      payload = verified as ClerkWebhookPayload;
     } catch {
       throw new BadRequestException('Chữ ký webhook không hợp lệ');
     }
@@ -102,7 +131,7 @@ export class ClerkWebhookController {
         clerkUserId,
         email,
         roleId: dbRole.id,
-        avatarUrl: image_url || null,
+        avatarUrl: image_url ?? undefined,
       });
 
       // Tạo profile cho user (tách fullName từ first_name và last_name)
@@ -130,13 +159,19 @@ export class ClerkWebhookController {
 
     // Xử lý sự kiện user.updated (sync email, avatar, name)
     if (payload.type === 'user.updated') {
-      const { id: clerkUserId, email_addresses, image_url, first_name, last_name } = payload.data;
+      const {
+        id: clerkUserId,
+        email_addresses,
+        image_url,
+        first_name,
+        last_name,
+      } = payload.data;
       const email = email_addresses?.[0]?.email_address;
       const fullName = `${first_name || ''} ${last_name || ''}`.trim();
 
       await this.userRepo.update(
         { clerkUserId },
-        { email, avatarUrl: image_url || null },
+        { email: email ?? undefined, avatarUrl: image_url ?? undefined },
       );
 
       // Đồng bộ vào Profile
@@ -153,7 +188,10 @@ export class ClerkWebhookController {
     if (payload.type === 'user.deleted') {
       const { id: clerkUserId } = payload.data;
       // Không xóa cứng — chỉ đổi status thành BANNED để giữ lịch sử
-      await this.userRepo.update({ clerkUserId }, { status: 'BANNED' as any });
+      await this.userRepo.update(
+        { clerkUserId },
+        { status: UserStatus.BANNED },
+      );
     }
 
     return { received: true };

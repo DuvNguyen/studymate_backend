@@ -22,7 +22,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @UseGuards(ClerkAuthGuard, RolesGuard)
 export class DiscussionsController {
   constructor(private readonly discussionsService: DiscussionsService) {}
-  
+
   @Get('instructor')
   @Roles('INSTRUCTOR')
   async getInstructor(
@@ -43,7 +43,10 @@ export class DiscussionsController {
   }
 
   @Get('lesson/:lessonId')
-  async getLesson(@CurrentUser() user: User, @Param('lessonId') lessonId: number) {
+  async getLesson(
+    @CurrentUser() user: User,
+    @Param('lessonId') lessonId: number,
+  ) {
     return this.discussionsService.getLessonDiscussions(lessonId, user);
   }
 

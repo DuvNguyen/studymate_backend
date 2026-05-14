@@ -55,7 +55,7 @@ export class OrdersService {
         0,
       );
 
-      let appliedCoupon: any = null;
+      let appliedCouponId: number | null = null;
       let discountAmountPerItem = 0;
 
       if (couponCode) {
@@ -63,7 +63,8 @@ export class OrdersService {
           couponCode,
           subtotal,
         );
-        appliedCoupon = validation.coupon;
+        const couponId = validation.coupon?.id;
+        appliedCouponId = typeof couponId === 'number' ? couponId : null;
         totalDiscount = validation.discountAmount;
         // Simple proportional discount if multiple items (or just split equally for this version)
         discountAmountPerItem = totalDiscount / cart.cart_items.length;
@@ -76,7 +77,7 @@ export class OrdersService {
         discount_amount: totalDiscount,
         total_amount: subtotal - totalDiscount,
         status: OrderStatus.PENDING,
-        coupon_id: appliedCoupon?.id || null,
+        coupon_id: appliedCouponId ?? undefined,
       });
       await queryRunner.manager.save(order);
 
@@ -93,7 +94,7 @@ export class OrdersService {
         const finalPrice = price - itemDiscount;
 
         // Default: 30/70 (0.3). With Coupon: 3/97 (0.03)
-        const commissionRate = appliedCoupon ? 0.03 : 0.3;
+        const commissionRate = appliedCouponId !== null ? 0.03 : 0.3;
         const platformFee = finalPrice * commissionRate;
         const instructorAmount = finalPrice - platformFee;
 
@@ -191,7 +192,8 @@ export class OrdersService {
         await queryRunner.manager.save(wallet);
 
         // Calculate total balance for audit
-        const totalBalanceAfter = Number(wallet.balance_available) + Number(wallet.balance_pending);
+        const totalBalanceAfter =
+          Number(wallet.balance_available) + Number(wallet.balance_pending);
 
         const transaction = queryRunner.manager.create(Transaction, {
           wallet_id: wallet.id,
@@ -206,9 +208,12 @@ export class OrdersService {
 
         // 3. Platform Fee Transaction
         // Find or create a system wallet (user_id 1 is typically admin)
-        let systemWallet: Wallet | null = await queryRunner.manager.findOne(Wallet, {
-          where: { user_id: 1 },
-        });
+        let systemWallet: Wallet | null = await queryRunner.manager.findOne(
+          Wallet,
+          {
+            where: { user_id: 1 },
+          },
+        );
         if (!systemWallet) {
           systemWallet = queryRunner.manager.create(Wallet, {
             user_id: 1,
@@ -218,22 +223,30 @@ export class OrdersService {
           });
           await queryRunner.manager.save(systemWallet);
         }
-        systemWallet.balance_available = Number(systemWallet.balance_available) + Number(item.platform_fee);
+        systemWallet.balance_available =
+          Number(systemWallet.balance_available) + Number(item.platform_fee);
         await queryRunner.manager.save(systemWallet);
 
-        await queryRunner.manager.save(queryRunner.manager.create(Transaction, {
-          wallet_id: systemWallet.id,
-          order_item_id: item.id,
-          transaction_type: 'PLATFORM_FEE',
-          amount: Number(item.platform_fee),
-          status: 'COMPLETED',
-          balance_after: Number(systemWallet.balance_available) + Number(systemWallet.balance_pending),
-        }));
+        await queryRunner.manager.save(
+          queryRunner.manager.create(Transaction, {
+            wallet_id: systemWallet.id,
+            order_item_id: item.id,
+            transaction_type: 'PLATFORM_FEE',
+            amount: Number(item.platform_fee),
+            status: 'COMPLETED',
+            balance_after:
+              Number(systemWallet.balance_available) +
+              Number(systemWallet.balance_pending),
+          }),
+        );
 
         // 4. Student Purchase Transaction (for history/ledger)
-        let studentWallet: Wallet | null = await queryRunner.manager.findOne(Wallet, {
-          where: { user_id: order.student_id },
-        });
+        let studentWallet: Wallet | null = await queryRunner.manager.findOne(
+          Wallet,
+          {
+            where: { user_id: order.student_id },
+          },
+        );
         if (!studentWallet) {
           studentWallet = queryRunner.manager.create(Wallet, {
             user_id: order.student_id,
@@ -244,14 +257,16 @@ export class OrdersService {
           await queryRunner.manager.save(studentWallet);
         }
         // Note: amount is positive for ledger representation of "revenue flow"
-        await queryRunner.manager.save(queryRunner.manager.create(Transaction, {
-          wallet_id: studentWallet.id,
-          order_item_id: item.id,
-          transaction_type: 'PURCHASE',
-          amount: Number(item.final_price),
-          status: 'COMPLETED',
-          balance_after: 0, // Students don't track balance in this context
-        }));
+        await queryRunner.manager.save(
+          queryRunner.manager.create(Transaction, {
+            wallet_id: studentWallet.id,
+            order_item_id: item.id,
+            transaction_type: 'PURCHASE',
+            amount: Number(item.final_price),
+            status: 'COMPLETED',
+            balance_after: 0, // Students don't track balance in this context
+          }),
+        );
       }
 
       // ── NEW: Update Coupon Usage Count upon payment completion ──
@@ -288,7 +303,11 @@ export class OrdersService {
           NotificationType.WALLET,
           'Thu nhập mới!',
           `Bạn vừa có học viên mới! ${amountFormatted} đã được cộng vào số dư đóng băng của bạn.`,
-          { courseId: item.course_id, orderId: order.id, amount: item.instructor_amount },
+          {
+            courseId: item.course_id,
+            orderId: order.id,
+            amount: item.instructor_amount,
+          },
         );
       }
 

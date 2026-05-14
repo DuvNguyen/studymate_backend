@@ -105,7 +105,10 @@ export class LessonProgressService {
           totalValue += 1;
         } else if (prog.watched_duration > 0 && lesson.durationSecs > 0) {
           // Add partial completion (capped at 0.99)
-          totalValue += Math.min(prog.watched_duration / lesson.durationSecs, 0.99);
+          totalValue += Math.min(
+            prog.watched_duration / lesson.durationSecs,
+            0.99,
+          );
         }
       }
     });

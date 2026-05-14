@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Lesson } from '../../database/entities/lesson.entity';
 import { Section } from '../../database/entities/section.entity';
-import { Video } from '../../database/entities/video.entity';
+import { Video, VideoStatus } from '../../database/entities/video.entity';
 
 @Injectable()
 export class LessonsService {
@@ -46,7 +46,7 @@ export class LessonsService {
         where: {
           id: dto.videoId,
           uploaderId: instructorId,
-          status: 'APPROVED' as any,
+          status: VideoStatus.APPROVED,
         },
       });
       if (!video)
@@ -106,7 +106,7 @@ export class LessonsService {
           where: {
             id: dto.videoId,
             uploaderId: instructorId,
-            status: 'APPROVED' as any,
+            status: VideoStatus.APPROVED,
           },
         });
         if (!video)

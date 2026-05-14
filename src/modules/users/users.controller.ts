@@ -27,6 +27,7 @@ import {
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { User } from '../../database/entities/user.entity';
+import { KycStatus } from '../../database/entities/instructor-profile.entity';
 
 @Controller('users')
 @UseGuards(ClerkAuthGuard, RolesGuard)
@@ -114,7 +115,7 @@ export class UsersController {
   @Patch(':id/kyc-status')
   async reviewKyc(
     @Param('id', ParseIntPipe) id: number,
-    @Body('status') status: any,
+    @Body('status') status: KycStatus,
     @Body('reason') reason?: string,
   ) {
     const result = await this.usersService.reviewKyc(id, status, reason);
@@ -179,11 +180,8 @@ export class UsersController {
   /** DELETE /api/v1/users/:id */
   @Roles('ADMIN')
   @Delete(':id')
-  async deleteUser(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() requestor: User,
-  ) {
-    const result = await this.usersService.deleteUser(id, requestor);
+  async deleteUser(@Param('id', ParseIntPipe) id: number) {
+    const result = await this.usersService.deleteUser(id);
     return { data: result, message: 'Xóa hệ thống và Clerk thành công' };
   }
 }

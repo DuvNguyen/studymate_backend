@@ -8,7 +8,6 @@ import { QuestionBankQuestion } from '../../database/entities/question-bank-ques
 import { QuestionBankOption } from '../../database/entities/question-bank-option.entity';
 import { QuestionBank } from '../../database/entities/question-bank.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
-import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [

@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, LessThanOrEqual, In } from 'typeorm';
@@ -19,6 +18,45 @@ import { NotificationType } from '../../database/entities/notification.entity';
 
 @Injectable()
 export class WalletsService {
+  private readonly defaultWalletStats = {
+    gross_revenue: 0,
+    total_payouts: 0,
+    total_commissions: 0,
+  };
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'Unknown error';
+  }
+
+  private parseWalletStatsRow(value: unknown): {
+    gross_revenue: string | number | null;
+    total_payouts: string | number | null;
+    total_commissions: string | number | null;
+  } {
+    if (!value || typeof value !== 'object') {
+      return this.defaultWalletStats;
+    }
+
+    const row = value as Record<string, unknown>;
+    return {
+      gross_revenue:
+        typeof row.gross_revenue === 'string' ||
+        typeof row.gross_revenue === 'number'
+          ? row.gross_revenue
+          : null,
+      total_payouts:
+        typeof row.total_payouts === 'string' ||
+        typeof row.total_payouts === 'number'
+          ? row.total_payouts
+          : null,
+      total_commissions:
+        typeof row.total_commissions === 'string' ||
+        typeof row.total_commissions === 'number'
+          ? row.total_commissions
+          : null,
+    };
+  }
+
   constructor(
     @InjectRepository(Wallet) private walletsRepo: Repository<Wallet>,
     @InjectRepository(Transaction)
@@ -42,12 +80,19 @@ export class WalletsService {
     return wallet;
   }
 
-  async getTransactionHistory(userId: number, page: number = 1, limit: number = 10) {
+  async getTransactionHistory(
+    userId: number,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     try {
       const wallet = await this.getMyWallet(userId);
-      console.log(`[WalletsService] Fetching transactions for wallet ID: ${wallet.id}`);
+      console.log(
+        `[WalletsService] Fetching transactions for wallet ID: ${wallet.id}`,
+      );
 
-      const qb = this.transactionsRepo.createQueryBuilder('tx')
+      const qb = this.transactionsRepo
+        .createQueryBuilder('tx')
         .leftJoinAndSelect('tx.order_item', 'orderItem')
         .leftJoinAndSelect('orderItem.course', 'course')
         .leftJoinAndSelect('orderItem.order', 'orderHead')
@@ -56,7 +101,7 @@ export class WalletsService {
         .where('tx.wallet_id = :walletId', { walletId: wallet.id })
         .andWhere('tx.status != :pendingStatus', { pendingStatus: 'PENDING' })
         .orderBy('tx.created_at', 'DESC');
-      
+
       console.log('[WalletsService] SQL:', qb.getSql());
 
       const [items, total] = await qb
@@ -72,7 +117,10 @@ export class WalletsService {
         totalPages: Math.ceil(total / limit),
       };
     } catch (error) {
-      console.error('[WalletsService] CRITICAL Error in getTransactionHistory:', error);
+      console.error(
+        '[WalletsService] CRITICAL Error in getTransactionHistory:',
+        error,
+      );
       throw error;
     }
   }
@@ -120,18 +168,21 @@ export class WalletsService {
     const [items, total] = await qb.getManyAndCount();
 
     // Calculate Master Stats (Simple aggregation)
-    const stats = await this.transactionsRepo.query(`
+    const statsRaw: unknown = await this.transactionsRepo.query(`
       SELECT 
         SUM(CASE WHEN transaction_type = 'PURCHASE' AND status != 'CANCELLED' THEN amount ELSE 0 END) as gross_revenue,
         SUM(CASE WHEN transaction_type = 'WITHDRAWAL' AND status = 'COMPLETED' THEN ABS(amount) ELSE 0 END) as total_payouts,
         SUM(CASE WHEN transaction_type = 'PLATFORM_FEE' AND status != 'CANCELLED' THEN amount ELSE 0 END) as total_commissions
       FROM transactions
     `);
+    const stats = Array.isArray(statsRaw)
+      ? this.parseWalletStatsRow(statsRaw[0])
+      : this.defaultWalletStats;
 
     return {
       items,
       total,
-      stats: stats[0],
+      stats,
     };
   }
 
@@ -169,7 +220,8 @@ export class WalletsService {
         transaction_type: 'WITHDRAWAL',
         amount: -dto.amount,
         status: 'PENDING',
-        balance_after: Number(wallet.balance_available) + Number(wallet.balance_pending),
+        balance_after:
+          Number(wallet.balance_available) + Number(wallet.balance_pending),
       });
       await queryRunner.manager.save(transaction);
 
@@ -180,7 +232,10 @@ export class WalletsService {
         where: { role: { roleName: 'ADMIN' } },
         relations: ['role'],
       });
-      const amountFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(dto.amount);
+      const amountFormatted = new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+      }).format(dto.amount);
       for (const admin of admins) {
         await this.notificationsService.sendNotification(
           admin.id,
@@ -238,7 +293,7 @@ export class WalletsService {
 
       // Find linked transaction to update status
       const linkedTx = await queryRunner.manager.findOne(Transaction, {
-        where: { payout_id: payout.id }
+        where: { payout_id: payout.id },
       });
 
       if (dto.status === PayoutStatus.COMPLETED) {
@@ -267,7 +322,8 @@ export class WalletsService {
             transaction_type: 'REFUND',
             amount: Number(payout.amount),
             status: 'AVAILABLE',
-            balance_after: Number(wallet.balance_available) + Number(wallet.balance_pending),
+            balance_after:
+              Number(wallet.balance_available) + Number(wallet.balance_pending),
           });
           await queryRunner.manager.save(refundTx);
         }
@@ -277,7 +333,8 @@ export class WalletsService {
 
       // Notify instructor about payout result
       const amountFormatted = new Intl.NumberFormat('vi-VN', {
-        style: 'currency', currency: 'VND',
+        style: 'currency',
+        currency: 'VND',
       }).format(Number(payout.amount));
 
       if (dto.status === PayoutStatus.COMPLETED) {
@@ -323,7 +380,8 @@ export class WalletsService {
       tx.status = 'AVAILABLE';
       tx.released_at = now;
 
-      wallet.balance_pending = Number(wallet.balance_pending) - Number(tx.amount);
+      wallet.balance_pending =
+        Number(wallet.balance_pending) - Number(tx.amount);
       wallet.balance_available =
         Number(wallet.balance_available) + Number(tx.amount);
 
@@ -403,11 +461,19 @@ export class WalletsService {
     return csv;
   }
 
-  async reconcilePayouts(
-    csvContent: string,
-  ): Promise<{ processed: number; success: number; failed: number; errors: string[] }> {
+  async reconcilePayouts(csvContent: string): Promise<{
+    processed: number;
+    success: number;
+    failed: number;
+    errors: string[];
+  }> {
     const lines = csvContent.trim().split('\n');
-    const results = { processed: 0, success: 0, failed: 0, errors: [] as string[] };
+    const results = {
+      processed: 0,
+      success: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
 
     // Skip header line
     for (let i = 1; i < lines.length; i++) {
@@ -415,7 +481,10 @@ export class WalletsService {
       if (cols.length < 2) continue;
 
       // Extract payout ID from "PO-123" format
-      const rawId = cols[0].replace('PO-', '').replace('"', '').replace('"', '');
+      const rawId = cols[0]
+        .replace('PO-', '')
+        .replace('"', '')
+        .replace('"', '');
       const payoutId = parseInt(rawId, 10);
       const status = cols[1].toUpperCase();
       const note = cols[2] || '';
@@ -452,13 +521,13 @@ export class WalletsService {
 
           // Update linked transaction
           const linkedTx = await queryRunner.manager.findOne(Transaction, {
-            where: { payout_id: payout.id }
+            where: { payout_id: payout.id },
           });
           if (linkedTx) {
             linkedTx.status = 'AVAILABLE';
             await queryRunner.manager.save(linkedTx);
           }
-          
+
           results.success++;
         } else if (status === 'FAILED' || status === 'REJECTED') {
           payout.status = PayoutStatus.REJECTED;
@@ -468,7 +537,7 @@ export class WalletsService {
 
           // Update linked transaction
           const linkedTx = await queryRunner.manager.findOne(Transaction, {
-            where: { payout_id: payout.id }
+            where: { payout_id: payout.id },
           });
           if (linkedTx) {
             linkedTx.status = 'CANCELLED';
@@ -489,7 +558,9 @@ export class WalletsService {
               transaction_type: 'REFUND',
               amount: Number(payout.amount),
               status: 'AVAILABLE',
-              balance_after: Number(wallet.balance_available) + Number(wallet.balance_pending),
+              balance_after:
+                Number(wallet.balance_available) +
+                Number(wallet.balance_pending),
             });
             await queryRunner.manager.save(refundTx);
           }
@@ -505,9 +576,11 @@ export class WalletsService {
 
         await queryRunner.commitTransaction();
         results.processed++;
-      } catch (err) {
+      } catch (err: unknown) {
         await queryRunner.rollbackTransaction();
-        results.errors.push(`Dòng ${i + 1}: Lỗi xử lý - ${err.message}`);
+        results.errors.push(
+          `Dòng ${i + 1}: Lỗi xử lý - ${this.getErrorMessage(err)}`,
+        );
       } finally {
         await queryRunner.release();
       }

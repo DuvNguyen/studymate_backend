@@ -14,12 +14,12 @@ import { Transaction } from '../../database/entities/transaction.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Order, 
-      OrderItem, 
-      Course, 
-      Category, 
-      User, 
-      Transaction
+      Order,
+      OrderItem,
+      Course,
+      Category,
+      User,
+      Transaction,
     ]),
   ],
   controllers: [StatisticsController],

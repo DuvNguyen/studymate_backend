@@ -43,7 +43,7 @@ import { SearchModule } from './modules/search/search.module';
         const dbUrl = config.get<string>('DATABASE_URL') || '';
         const host = dbUrl.split('@')[1]?.split('/')[0] || 'unknown';
         console.log(`[Database] Connecting to: ${host}`);
-        
+
         return {
           type: 'postgres',
           url: dbUrl,
@@ -56,13 +56,13 @@ import { SearchModule } from './modules/search/search.module';
               rejectUnauthorized: false,
             },
             max: 10,
-            connectionTimeoutMillis: 30000, 
+            connectionTimeoutMillis: 30000,
             idleTimeoutMillis: 30000,
           },
         };
       },
     }),
-    
+
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
@@ -73,7 +73,7 @@ import { SearchModule } from './modules/search/search.module';
         ttl: parseInt(config.get('REDIS_TTL', '3600'), 10) * 1000,
       }),
     }),
-    
+
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     ScheduleModule.forRoot(),
 

@@ -32,7 +32,6 @@ import { Payout } from '../entities/payout.entity';
 import { Review } from '../entities/review.entity';
 
 import { seedRoles } from './01-roles.seed';
-import { seedUsers } from './02-users.seed';
 import { seedCategories } from './03-categories.seed';
 import { seedTransactions } from './07-transactions.seed';
 import { seedQuestionBanks } from './09-question-banks.seed';

@@ -94,14 +94,17 @@ export class DiscussionsService {
     if (!full) throw new NotFoundException('Lỗi lưu thảo luận');
 
     // Send notifications in the background
-    this.sendDiscussionNotifications(saved, user, dto);
+    void this.sendDiscussionNotifications(saved, user, dto);
 
     return plainToInstance(DiscussionResponseDto, {
       ...full,
       content: full.content,
       user: {
         id: full.user.id,
-        fullName: full.user.profile?.fullName || full.user.email.split('@')[0] || 'Anonymous',
+        fullName:
+          full.user.profile?.fullName ||
+          full.user.email.split('@')[0] ||
+          'Anonymous',
         avatarUrl: full.user.avatarUrl,
         role: { roleName: full.user.role?.roleName || 'STUDENT' },
       },
@@ -114,7 +117,8 @@ export class DiscussionsService {
     dto: CreateDiscussionDto,
   ) {
     try {
-      const authorName = user.profile?.fullName || user.email?.split('@')[0] || 'Người dùng';
+      const authorName =
+        user.profile?.fullName || user.email?.split('@')[0] || 'Người dùng';
 
       // 1. If it's a reply, notify the parent comment author
       if (dto.parentId) {
@@ -128,24 +132,32 @@ export class DiscussionsService {
             NotificationType.COMMUNITY,
             'Trả lời mới!',
             `${authorName} đã trả lời bình luận của bạn. Xem ngay!`,
-            { discussionId: discussion.id, lessonId: dto.lessonId, courseId: dto.courseId },
+            {
+              discussionId: discussion.id,
+              lessonId: dto.lessonId,
+              courseId: dto.courseId,
+            },
           );
         }
-      } 
+      }
       // 2. If it's a NEW question (root), notify the instructor
       else {
-        const course = await this.coursesRepo.findOne({ 
+        const course = await this.coursesRepo.findOne({
           where: { id: dto.courseId },
           relations: ['instructor'],
         });
-        
+
         if (course && course.instructorId !== user.id) {
           await this.notificationsService.sendNotification(
             course.instructorId,
             NotificationType.COMMUNITY,
             'Câu hỏi mới từ học viên!',
             `${authorName} đã đặt một câu hỏi mới trong khóa học "${course.title}".`,
-            { discussionId: discussion.id, lessonId: dto.lessonId, courseId: dto.courseId },
+            {
+              discussionId: discussion.id,
+              lessonId: dto.lessonId,
+              courseId: dto.courseId,
+            },
           );
         }
       }
@@ -199,8 +211,10 @@ export class DiscussionsService {
     if (!discussion) throw new NotFoundException('Không tìm thấy thảo luận');
 
     // Only instructor can mark best answer
-    if (user.role.roleName !== RoleName.INSTRUCTOR) {
-      throw new ForbiddenException('Chỉ có Giảng viên mới được đánh dấu câu trả lời đúng');
+    if (String(user.role.roleName) !== (RoleName.INSTRUCTOR as string)) {
+      throw new ForbiddenException(
+        'Chỉ có Giảng viên mới được đánh dấu câu trả lời đúng',
+      );
     }
 
     discussion.is_best_answer = !discussion.is_best_answer;
@@ -214,7 +228,8 @@ export class DiscussionsService {
 
     const discussion = await this.discussionsRepo.findOne({ where: { id } });
     if (!discussion) throw new NotFoundException('Không tìm thấy thảo luận');
-    if (discussion.is_deleted) throw new BadRequestException('Không thể vote bình luận đã xóa');
+    if (discussion.is_deleted)
+      throw new BadRequestException('Không thể vote bình luận đã xóa');
 
     let vote = await this.discussionVotesRepo.findOne({
       where: { discussion_id: id, user_id: user.id },
@@ -253,7 +268,11 @@ export class DiscussionsService {
 
     await this.discussionsRepo.save(discussion);
 
-    return { upvotes: discussion.upvotes, downvotes: discussion.downvotes, userVote: value };
+    return {
+      upvotes: discussion.upvotes,
+      downvotes: discussion.downvotes,
+      userVote: value,
+    };
   }
 
   async softDelete(id: number, user: User) {
@@ -303,7 +322,8 @@ export class DiscussionsService {
     page: number = 1,
     limit: number = 20,
   ) {
-    const qb = this.discussionsRepo.createQueryBuilder('d')
+    const qb = this.discussionsRepo
+      .createQueryBuilder('d')
       .innerJoinAndSelect('d.course', 'course')
       .innerJoinAndSelect('d.lesson', 'lesson')
       .leftJoinAndSelect('d.user', 'user')
@@ -355,11 +375,16 @@ export class DiscussionsService {
     return discussions.map((d) => this.mapToDto(d, new Map()));
   }
 
-  private mapToDto(d: LessonDiscussion, voteMap: Map<number, number>): DiscussionResponseDto {
+  private mapToDto(
+    d: LessonDiscussion,
+    voteMap: Map<number, number>,
+  ): DiscussionResponseDto {
     const content = d.is_deleted ? '_Bình luận không có sẵn_' : d.content;
     const fullName = d.is_deleted
       ? '[Người dùng đã xóa]'
-      : d.user?.profile?.fullName || d.user?.email?.split('@')[0] || 'Anonymous';
+      : d.user?.profile?.fullName ||
+        d.user?.email?.split('@')[0] ||
+        'Anonymous';
 
     return plainToInstance(DiscussionResponseDto, {
       ...d,
@@ -367,22 +392,28 @@ export class DiscussionsService {
       upvotes: d.upvotes || 0,
       downvotes: d.downvotes || 0,
       userVote: voteMap.get(d.id) || 0,
-      course: d.course ? {
-        id: d.course.id,
-        title: d.course.title,
-        slug: d.course.slug,
-      } : undefined,
-      lesson: d.lesson ? {
-        id: d.lesson.id,
-        title: d.lesson.title,
-      } : undefined,
+      course: d.course
+        ? {
+            id: d.course.id,
+            title: d.course.title,
+            slug: d.course.slug,
+          }
+        : undefined,
+      lesson: d.lesson
+        ? {
+            id: d.lesson.id,
+            title: d.lesson.title,
+          }
+        : undefined,
       user: {
         id: d.user?.id,
         fullName,
         avatarUrl: d.is_deleted ? null : d.user?.avatarUrl,
         role: { roleName: d.user?.role?.roleName || 'STUDENT' },
       },
-      children: d.children ? d.children.map((c) => this.mapToDto(c, voteMap)) : [],
+      children: d.children
+        ? d.children.map((c) => this.mapToDto(c, voteMap))
+        : [],
     });
   }
 }

@@ -16,14 +16,15 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS — cho phép frontend gọi API
-  const frontendUrl = config.get('FRONTEND_URL') || 'http://localhost:3000';
+  const frontendUrl =
+    config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
   app.enableCors({
     origin: [
       frontendUrl,
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:3001', // cho chính nó nếu cần
-      'http://127.0.0.1:3001'
+      'http://127.0.0.1:3001',
     ],
     credentials: true,
   });
@@ -46,4 +47,4 @@ async function bootstrap() {
   console.log(` Backend đang chạy tại http://localhost:${port}/api/v1`);
 }
 
-bootstrap();
+void bootstrap();

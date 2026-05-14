@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Enrollment } from '../../database/entities/enrollment.entity';
 import { User } from '../../database/entities/user.entity';
+import { Course } from '../../database/entities/course.entity';
 import { plainToInstance } from 'class-transformer';
 import { EnrollmentResponseDto } from './dto/enrollment-response.dto';
 
@@ -31,7 +32,7 @@ export class EnrollmentsService {
       );
 
       return enrollments.map((e) => this.mapToDto(e));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[EnrollmentsService] Error fetching courses:`, error);
       throw error;
     }
@@ -41,12 +42,18 @@ export class EnrollmentsService {
     try {
       const enrollments = await this.enrollmentsRepo.find({
         where: { student_id: user.id },
-        relations: ['course', 'course.instructor', 'course.instructor.profile', 'order_item', 'refund_request'],
+        relations: [
+          'course',
+          'course.instructor',
+          'course.instructor.profile',
+          'order_item',
+          'refund_request',
+        ],
         order: { enrolled_at: 'DESC' },
       });
 
       return enrollments.map((e) => this.mapToDto(e));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[EnrollmentsService] Error fetching purchases:`, error);
       throw error;
     }
@@ -57,7 +64,10 @@ export class EnrollmentsService {
       ...e,
       course: {
         ...e.course,
-        instructor_name: e.course.instructor?.profile?.fullName || e.course.instructor?.email || 'Instructor',
+        instructor_name:
+          e.course.instructor?.profile?.fullName ||
+          e.course.instructor?.email ||
+          'Instructor',
       },
     };
     return plainToInstance(EnrollmentResponseDto, data, {
@@ -70,10 +80,10 @@ export class EnrollmentsService {
     enroller: User,
     targetStudentId?: number,
   ): Promise<EnrollmentResponseDto> {
-    const course = (await this.enrollmentsRepo.manager.findOne('Course', {
+    const course = await this.enrollmentsRepo.manager.findOne(Course, {
       where: { id: courseId },
       relations: ['instructor', 'instructor.profile'],
-    })) as any;
+    });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
 
     const studentId = targetStudentId || enroller.id;
@@ -102,7 +112,10 @@ export class EnrollmentsService {
       ...saved,
       course: {
         ...course,
-        instructor_name: course.instructor?.profile?.fullName || course.instructor?.email || 'Instructor',
+        instructor_name:
+          course.instructor?.profile?.fullName ||
+          course.instructor?.email ||
+          'Instructor',
       },
     };
     return plainToInstance(EnrollmentResponseDto, data, {

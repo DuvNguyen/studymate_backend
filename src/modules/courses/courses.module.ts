@@ -12,7 +12,6 @@ import { CoursesController } from './courses.controller';
 import { InstructorCoursesController } from './instructor-courses.controller';
 import { AdminCoursesController } from './admin-courses.controller';
 import { CoursesService } from './courses.service';
-import { AuthModule } from '../auth/auth.module';
 import { SearchModule } from '../search/search.module';
 
 @Module({

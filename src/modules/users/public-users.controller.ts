@@ -15,7 +15,10 @@ export class PublicUsersController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    const data = await this.usersService.getPublicPortfolio(id, { page, limit });
+    const data = await this.usersService.getPublicPortfolio(id, {
+      page,
+      limit,
+    });
     return { data, message: 'Lấy thông tin giảng viên thành công' };
   }
 }

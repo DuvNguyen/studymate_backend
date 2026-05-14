@@ -1,13 +1,40 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, FindOptionsWhere } from 'typeorm';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { QuizAttempt } from '../../database/entities/quiz-attempt.entity';
-import { QuestionBankQuestion } from '../../database/entities/question-bank-question.entity';
+import {
+  QuestionBankQuestion,
+  QuestionDifficulty,
+  QuestionType,
+} from '../../database/entities/question-bank-question.entity';
 import { QuestionBank } from '../../database/entities/question-bank.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
+
+interface QuizSnapshotOption {
+  id: number;
+  text: string;
+}
+
+interface QuizSnapshotItem {
+  id: number;
+  text: string;
+  type: QuestionType;
+  points: number;
+  options: QuizSnapshotOption[];
+}
+
+type SubmitAnswerValue = number | string | Array<number | string>;
+type SubmitAnswersMap = Record<string, SubmitAnswerValue>;
+export type SubmitAnswersPayload =
+  | { answers?: SubmitAnswersMap }
+  | SubmitAnswersMap;
 
 @Injectable()
 export class QuizzesService {
@@ -24,6 +51,29 @@ export class QuizzesService {
     private enrollmentRepository: Repository<Enrollment>,
     private notificationsService: NotificationsService,
   ) {}
+
+  private parseSnapshots(raw: unknown): QuizSnapshotItem[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((item): item is QuizSnapshotItem => {
+      if (!item || typeof item !== 'object') return false;
+      const snapshot = item as Partial<QuizSnapshotItem>;
+      return (
+        typeof snapshot.id === 'number' &&
+        typeof snapshot.text === 'string' &&
+        typeof snapshot.points === 'number' &&
+        Array.isArray(snapshot.options)
+      );
+    });
+  }
+
+  private parseAnswersMap(payload: SubmitAnswersPayload): SubmitAnswersMap {
+    if (!payload || typeof payload !== 'object') return {};
+    const wrapped = payload as { answers?: unknown };
+    if (wrapped.answers && typeof wrapped.answers === 'object') {
+      return wrapped.answers as SubmitAnswersMap;
+    }
+    return payload as SubmitAnswersMap;
+  }
 
   async getQuizzesByCourse(courseId: number) {
     return this.quizRepository.find({
@@ -50,7 +100,9 @@ export class QuizzesService {
   }
 
   async startAttempt(quizId: number, userId: number) {
-    console.log(`[QuizzesService] startAttempt called for quizId: ${quizId}, userId: ${userId}`);
+    console.log(
+      `[QuizzesService] startAttempt called for quizId: ${quizId}, userId: ${userId}`,
+    );
     const quiz = await this.getQuiz(quizId);
     console.log(`[QuizzesService] Quiz found: ${quiz?.title}`);
 
@@ -58,79 +110,109 @@ export class QuizzesService {
     const attempts = await this.getUserAttempts(quizId, userId);
     console.log(`[QuizzesService] Past attempts count: ${attempts.length}`);
     if (quiz.isFinal && attempts.length >= 2) {
-      throw new BadRequestException('BẠN ĐÃ HẾT LƯỢT LÀM BÀI KIỂM TRA CUỐI KHÓA (TỐI ĐA 2 LẦN)');
+      throw new BadRequestException(
+        'BẠN ĐÃ HẾT LƯỢT LÀM BÀI KIỂM TRA CUỐI KHÓA (TỐI ĐA 2 LẦN)',
+      );
     }
 
     // Pick random questions from bank
     let picked: QuestionBankQuestion[] = [];
-    const isCustom = (quiz.numEasy + quiz.numMedium + quiz.numHard) > 0;
+    const isCustom = quiz.numEasy + quiz.numMedium + quiz.numHard > 0;
 
     if (isCustom) {
-      console.log(`[QuizzesService] Custom mode active. Easy:${quiz.numEasy}, Med:${quiz.numMedium}, Hard:${quiz.numHard}`);
+      console.log(
+        `[QuizzesService] Custom mode active. Easy:${quiz.numEasy}, Med:${quiz.numMedium}, Hard:${quiz.numHard}`,
+      );
       // Logic for Custom distribution
-      const difficultyMap = [
-        { type: 'EASY', count: quiz.numEasy },
-        { type: 'MEDIUM', count: quiz.numMedium },
-        { type: 'HARD', count: quiz.numHard },
-      ];
+      const difficultyMap: Array<{ type: QuestionDifficulty; count: number }> =
+        [
+          { type: QuestionDifficulty.EASY, count: quiz.numEasy },
+          { type: QuestionDifficulty.MEDIUM, count: quiz.numMedium },
+          { type: QuestionDifficulty.HARD, count: quiz.numHard },
+        ];
 
       for (const diff of difficultyMap) {
-         if (diff.count > 0) {
-            const questions = await this.questionRepository.find({
-               where: { 
-                 bankId: quiz.bankId, 
-                 isActive: true, 
-                 difficulty: diff.type as any,
-                 ...(quiz.sectionId ? { sectionId: quiz.sectionId } : {})
-               },
-               relations: ['options'],
-            });
-            console.log(`[QuizzesService] Found ${questions.length} questions for ${diff.type}`);
-            // Shuffle subset and take required count
-            const shuffled = questions.sort(() => 0.5 - Math.random());
-            picked = [...picked, ...shuffled.slice(0, Math.min(diff.count, questions.length))];
-         }
+        if (diff.count > 0) {
+          const where: FindOptionsWhere<QuestionBankQuestion> = {
+            bankId: quiz.bankId,
+            isActive: true,
+            difficulty: diff.type,
+          };
+          if (quiz.sectionId) {
+            where.sectionId = quiz.sectionId;
+          }
+          const questions = await this.questionRepository.find({
+            where,
+            relations: ['options'],
+          });
+          console.log(
+            `[QuizzesService] Found ${questions.length} questions for ${diff.type}`,
+          );
+          // Shuffle subset and take required count
+          const shuffled = questions.sort(() => 0.5 - Math.random());
+          picked = [
+            ...picked,
+            ...shuffled.slice(0, Math.min(diff.count, questions.length)),
+          ];
+        }
       }
       // Shuffle combined set
       picked = picked.sort(() => 0.5 - Math.random());
     } else {
-      console.log(`[QuizzesService] Random mode active. Priority: ${quiz.difficulty || 'NONE'}`);
+      console.log(
+        `[QuizzesService] Random mode active. Priority: ${quiz.difficulty || 'NONE'}`,
+      );
       // Original Random logic
-      const where: any = { bankId: quiz.bankId, isActive: true };
+      const where: FindOptionsWhere<QuestionBankQuestion> = {
+        bankId: quiz.bankId,
+        isActive: true,
+      };
       if (quiz.sectionId) where.sectionId = quiz.sectionId;
-      if (quiz.difficulty) where.difficulty = quiz.difficulty;
+      if (quiz.difficulty)
+        where.difficulty = quiz.difficulty as QuestionDifficulty;
 
       const allQuestions = await this.questionRepository.find({
         where,
         relations: ['options'],
       });
-      console.log(`[QuizzesService] Total matching questions: ${allQuestions.length}`);
+      console.log(
+        `[QuizzesService] Total matching questions: ${allQuestions.length}`,
+      );
 
       if (allQuestions.length === 0) {
-        throw new BadRequestException('NGÂN HÀNG CÂU HỎI TRỐNG, VUI LÒNG LIÊN HỆ GIẢNG VIÊN');
+        throw new BadRequestException(
+          'NGÂN HÀNG CÂU HỎI TRỐNG, VUI LÒNG LIÊN HỆ GIẢNG VIÊN',
+        );
       }
 
       const shuffled = allQuestions.sort(() => 0.5 - Math.random());
-      picked = shuffled.slice(0, Math.min(quiz.numQuestions, allQuestions.length));
+      picked = shuffled.slice(
+        0,
+        Math.min(quiz.numQuestions, allQuestions.length),
+      );
     }
 
     console.log(`[QuizzesService] Final picked count: ${picked.length}`);
 
     // Prepare snapshots (randomize options too)
-    const snapshots = picked.map(q => {
-      const correctOptions = q.options.filter(o => o.isCorrect);
-      const incorrectOptions = q.options.filter(o => !o.isCorrect);
+    const snapshots = picked.map((q) => {
+      const correctOptions = q.options.filter((o) => o.isCorrect);
+      const incorrectOptions = q.options.filter((o) => !o.isCorrect);
 
       // Pick 1 correct option (randomly if multiple exist)
-      const pickedCorrect = correctOptions.sort(() => 0.5 - Math.random()).slice(0, 1);
-      
+      const pickedCorrect = correctOptions
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 1);
+
       // Pick 3 random incorrect options
-      const pickedIncorrect = incorrectOptions.sort(() => 0.5 - Math.random()).slice(0, 3);
+      const pickedIncorrect = incorrectOptions
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 3);
 
       // Combine and shuffle the final 4 options
       const finalOptions = [...pickedCorrect, ...pickedIncorrect]
         .sort(() => 0.5 - Math.random())
-        .map(o => ({
+        .map((o) => ({
           id: o.id,
           text: o.optionText,
         }));
@@ -155,25 +237,30 @@ export class QuizzesService {
 
     const saved = await this.attemptRepository.save(attempt);
     return this.attemptRepository.findOne({
-       where: { id: saved.id },
-       relations: ['quiz']
+      where: { id: saved.id },
+      relations: ['quiz'],
     });
   }
 
-  async submitAttempt(attemptId: number, userId: number, answers: any) {
+  async submitAttempt(
+    attemptId: number,
+    userId: number,
+    answers: SubmitAnswersPayload,
+  ) {
     const attempt = await this.attemptRepository.findOne({
       where: { id: attemptId, userId },
       relations: ['quiz'],
     });
 
     if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài');
-    if (attempt.completedAt) throw new BadRequestException('BÀI KIỂM TRA ĐÃ ĐƯỢC NỘP TRƯỚC ĐÓ');
+    if (attempt.completedAt)
+      throw new BadRequestException('BÀI KIỂM TRA ĐÃ ĐƯỢC NỘP TRƯỚC ĐÓ');
 
     const quiz = attempt.quiz;
-    const snapshots = attempt.questionSnapshots;
-    
+    const snapshots = this.parseSnapshots(attempt.questionSnapshots);
+
     // Fetch correct options from DB to grade
-    const questionIds = snapshots.map((s: any) => s.id);
+    const questionIds = snapshots.map((s) => s.id);
     const questionsWithCorrect = await this.questionRepository.find({
       where: { id: In(questionIds) },
       relations: ['options'],
@@ -183,24 +270,30 @@ export class QuizzesService {
     const totalCount = snapshots.length;
 
     // The frontend sends { answers: { questionId: [optionId] } }
-    const answersMap = answers?.answers || answers || {};
+    const answersMap = this.parseAnswersMap(answers);
 
-    snapshots.forEach((s: any) => {
-      const question = questionsWithCorrect.find(q => Number(q.id) === Number(s.id));
+    snapshots.forEach((s) => {
+      const question = questionsWithCorrect.find(
+        (q) => Number(q.id) === Number(s.id),
+      );
       if (!question) {
-        console.log(`[QuizzesService] Question not found for snapshot id: ${s.id}`);
+        console.log(
+          `[QuizzesService] Question not found for snapshot id: ${s.id}`,
+        );
         return;
       }
 
-      const studentAnswer = answersMap[s.id] || answersMap[String(s.id)]; 
-      const correctOption = question.options.find(o => o.isCorrect);
+      const studentAnswer = answersMap[s.id] || answersMap[String(s.id)];
+      const correctOption = question.options.find((o) => o.isCorrect);
 
-      console.log(`[grading] Q:${s.id} Student:${JSON.stringify(studentAnswer)} Correct:${correctOption?.id}`);
+      console.log(
+        `[grading] Q:${s.id} Student:${JSON.stringify(studentAnswer)} Correct:${correctOption?.id}`,
+      );
 
       if (correctOption) {
         const correctId = Number(correctOption.id);
         if (Array.isArray(studentAnswer)) {
-          if (studentAnswer.some(id => Number(id) === correctId)) {
+          if (studentAnswer.some((id) => Number(id) === correctId)) {
             correctCount++;
             console.log(`[grading] Correct via array`);
           }
@@ -226,21 +319,31 @@ export class QuizzesService {
     // If final exam and passed, mark enrollment as completed?
     // Actually, enrollment completion might depend on more factors, but this is a key one.
     if (quiz.isFinal && isPassed) {
-       await this.markCourseCompleted(quiz.courseId, userId);
+      await this.markCourseCompleted(quiz.courseId, userId);
     }
 
     // Send quiz notifications in the background
-    this.sendQuizNotifications(quiz, userId, scorePercent, isPassed, correctCount, totalCount);
+    void this.sendQuizNotifications(
+      quiz,
+      userId,
+      scorePercent,
+      isPassed,
+      correctCount,
+      totalCount,
+    );
 
     return {
       ...saved,
       correctCount,
       totalCount,
-      correctAnswers: questionsWithCorrect.reduce((acc, q) => {
-        const correctOpt = q.options.find(o => o.isCorrect);
-        if (correctOpt) acc[q.id] = correctOpt.id;
-        return acc;
-      }, {} as Record<number, number>)
+      correctAnswers: questionsWithCorrect.reduce(
+        (acc, q) => {
+          const correctOpt = q.options.find((o) => o.isCorrect);
+          if (correctOpt) acc[q.id] = correctOpt.id;
+          return acc;
+        },
+        {} as Record<number, number>,
+      ),
     };
   }
 
@@ -252,19 +355,22 @@ export class QuizzesService {
 
     if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài');
 
-    const snapshots = attempt.questionSnapshots;
-    const questionIds = snapshots.map((s: any) => s.id);
-    
+    const snapshots = this.parseSnapshots(attempt.questionSnapshots);
+    const questionIds = snapshots.map((s) => s.id);
+
     const questionsWithCorrect = await this.questionRepository.find({
       where: { id: In(questionIds) },
       relations: ['options'],
     });
 
-    const correctAnswers = questionsWithCorrect.reduce((acc, q) => {
-      const correctOpt = q.options.find(o => o.isCorrect);
-      if (correctOpt) acc[q.id] = correctOpt.id;
-      return acc;
-    }, {} as Record<number, number>);
+    const correctAnswers = questionsWithCorrect.reduce(
+      (acc, q) => {
+        const correctOpt = q.options.find((o) => o.isCorrect);
+        if (correctOpt) acc[q.id] = correctOpt.id;
+        return acc;
+      },
+      {} as Record<number, number>,
+    );
 
     return {
       ...attempt,
@@ -331,12 +437,12 @@ export class QuizzesService {
 
   // ── Instructor Quiz Methods ─────────────────────────────────────
 
-  async createQuiz(data: any) {
+  async createQuiz(data: Partial<Quiz>) {
     const quiz = this.quizRepository.create(data);
     return this.quizRepository.save(quiz);
   }
 
-  async updateQuiz(id: number, data: any) {
+  async updateQuiz(id: number, data: Partial<Quiz>) {
     await this.quizRepository.update(id, data);
     return this.getQuiz(id);
   }
@@ -354,7 +460,7 @@ export class QuizzesService {
     });
   }
 
-  async createBank(data: any) {
+  async createBank(data: Partial<QuestionBank>) {
     const bank = this.bankRepository.create(data);
     return this.bankRepository.save(bank);
   }
@@ -368,7 +474,7 @@ export class QuizzesService {
     return bank;
   }
 
-  async createQuestion(bankId: number, data: any) {
+  async createQuestion(bankId: number, data: Partial<QuestionBankQuestion>) {
     const question = this.questionRepository.create({
       ...data,
       bankId,
@@ -376,10 +482,13 @@ export class QuizzesService {
     return this.questionRepository.save(question);
   }
 
-  async updateQuestion(id: number, data: any) {
+  async updateQuestion(id: number, data: Partial<QuestionBankQuestion>) {
     // Handling options update logic could be complex, for now assume simple update or separate endpoints
     await this.questionRepository.update(id, data);
-    return this.questionRepository.findOne({ where: { id }, relations: ['options'] });
+    return this.questionRepository.findOne({
+      where: { id },
+      relations: ['options'],
+    });
   }
 
   async deleteQuestion(id: number) {

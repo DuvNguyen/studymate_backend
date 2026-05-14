@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { Course } from '../entities/course.entity';
+import { Section } from '../entities/section.entity';
 import { QuestionBank } from '../entities/question-bank.entity';
 import {
   QuestionBankQuestion,
@@ -19,9 +20,13 @@ export async function seedQuestionBanks(dataSource: DataSource) {
   const examRepo = dataSource.getRepository(Exam);
 
   // 1. Tìm khóa học Master Linux
-  const course = await courseRepo.findOne({ where: { slug: 'master-linux-ubuntu' } });
+  const course = await courseRepo.findOne({
+    where: { slug: 'master-linux-ubuntu' },
+  });
   if (!course) {
-    console.log('Không tìm thấy Course Master Linux, bỏ qua seed ngân hàng câu hỏi.');
+    console.log(
+      'Không tìm thấy Course Master Linux, bỏ qua seed ngân hàng câu hỏi.',
+    );
     return;
   }
 
@@ -35,19 +40,23 @@ export async function seedQuestionBanks(dataSource: DataSource) {
   const bank = qbRepo.create({
     courseId: course.id,
     title: 'Ngân hàng câu hỏi chuẩn: Linux Masterclass',
-    description: 'Tập hợp 150 câu hỏi trắc nghiệm từ cơ bản đến nâng cao về Linux Ubuntu.',
+    description:
+      'Tập hợp 150 câu hỏi trắc nghiệm từ cơ bản đến nâng cao về Linux Ubuntu.',
   });
   const savedBank = await qbRepo.save(bank);
 
   // 3. Đọc và parse CSV
-  const csvPath = path.join(process.cwd(), '../docs/ngan_hang_cau_hoi_linux_150.csv');
+  const csvPath = path.join(
+    process.cwd(),
+    '../docs/ngan_hang_cau_hoi_linux_150.csv',
+  );
   if (!fs.existsSync(csvPath)) {
     console.error(`Không tìm thấy file CSV tại: ${csvPath}`);
     return;
   }
 
   const content = fs.readFileSync(csvPath, 'utf-8');
-  const lines = content.split('\n').filter(line => line.trim() !== '');
+  const lines = content.split('\n').filter((line) => line.trim() !== '');
 
   console.log(`Bắt đầu import ${lines.length - 1} câu hỏi từ CSV...`);
 
@@ -71,9 +80,9 @@ export async function seedQuestionBanks(dataSource: DataSource) {
   }
 
   // Lấy các Sections của khóa học để gán câu hỏi
-  const sections = await dataSource.getRepository('sections').find({
+  const sections = await dataSource.getRepository(Section).find({
     where: { courseId: course.id },
-    order: { position: 'ASC' }
+    order: { position: 'ASC' },
   });
 
   // Skip header line
@@ -83,15 +92,20 @@ export async function seedQuestionBanks(dataSource: DataSource) {
 
     const questionText = cols[1];
     const correctAnswer = cols[2];
-    const wrongAnswers = cols.slice(3).filter(a => a !== '');
+    const wrongAnswers = cols.slice(3).filter((a) => a !== '');
 
     // Phân bổ câu hỏi theo chương (giả định chia đôi)
     const sectionIndex = i <= 80 ? 0 : 1;
     const sectionId = sections[sectionIndex]?.id || null;
 
     // Ngẫu nhiên độ khó
-    const difficulties = [QuestionDifficulty.EASY, QuestionDifficulty.MEDIUM, QuestionDifficulty.HARD];
-    const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+    const difficulties = [
+      QuestionDifficulty.EASY,
+      QuestionDifficulty.MEDIUM,
+      QuestionDifficulty.HARD,
+    ];
+    const difficulty =
+      difficulties[Math.floor(Math.random() * difficulties.length)];
 
     // Tạo câu hỏi
     const question = questionRepo.create({
@@ -106,13 +120,13 @@ export async function seedQuestionBanks(dataSource: DataSource) {
     const savedQuestion = await questionRepo.save(question);
 
     // Tạo options
-    const options = [
+    const options: Partial<QuestionBankOption>[] = [
       {
         questionId: savedQuestion.id,
         optionText: correctAnswer,
         isCorrect: true,
         sortOrder: 1,
-      }
+      },
     ];
 
     wrongAnswers.forEach((text, index) => {
@@ -132,11 +146,14 @@ export async function seedQuestionBanks(dataSource: DataSource) {
     courseId: course.id,
     bankId: savedBank.id,
     title: 'Bài thi cuối khóa: Linux Master',
-    description: 'Bài kiểm tra tổng quát toàn bộ kiến thức Linux Ubuntu với 50 câu hỏi ngẫu nhiên.',
+    description:
+      'Bài kiểm tra tổng quát toàn bộ kiến thức Linux Ubuntu với 50 câu hỏi ngẫu nhiên.',
     timeLimit: 60,
     createdById: instructorId,
   });
   await examRepo.save(exam);
 
-  console.log(`Seed thành công ngân hàng câu hỏi và đề thi cho Course ID ${course.id}.`);
+  console.log(
+    `Seed thành công ngân hàng câu hỏi và đề thi cho Course ID ${course.id}.`,
+  );
 }
