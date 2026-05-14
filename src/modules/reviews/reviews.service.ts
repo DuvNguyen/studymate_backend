@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Review } from '../../database/entities/review.entity';
@@ -18,7 +22,10 @@ export class ReviewsService {
     private notificationsService: NotificationsService,
   ) {}
 
-  async create(data: { courseId: number; rating: number; comment?: string }, user: User) {
+  async create(
+    data: { courseId: number; rating: number; comment?: string },
+    user: User,
+  ) {
     // Check if user already reviewed this course
     const existingReview = await this.reviewsRepo.findOne({
       where: { userId: user.id, course_id: data.courseId },
@@ -57,7 +64,10 @@ export class ReviewsService {
 
       const totalRating = reviews.reduce((acc, r) => acc + r.rating, 0);
       course.reviewCount = reviews.length;
-      course.avgRating = reviews.length > 0 ? Number((totalRating / reviews.length).toFixed(2)) : 0;
+      course.avgRating =
+        reviews.length > 0
+          ? Number((totalRating / reviews.length).toFixed(2))
+          : 0;
 
       await queryRunner.manager.save(course);
 

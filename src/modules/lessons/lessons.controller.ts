@@ -6,12 +6,12 @@ import {
   Body,
   Param,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('instructor')
 @UseGuards(ClerkAuthGuard, RolesGuard)
@@ -21,7 +21,7 @@ export class LessonsController {
 
   @Post('sections/:sectionId/lessons')
   async createLesson(
-    @Req() req,
+    @CurrentUser('id') userId: number,
     @Param('sectionId') sectionId: number,
     @Body()
     dto: {
@@ -32,12 +32,12 @@ export class LessonsController {
       position?: number;
     },
   ) {
-    return this.lessonsService.createLesson(req.user.id, sectionId, dto);
+    return this.lessonsService.createLesson(userId, sectionId, dto);
   }
 
   @Put('lessons/:id')
   async updateLesson(
-    @Req() req,
+    @CurrentUser('id') userId: number,
     @Param('id') id: number,
     @Body()
     dto: {
@@ -48,11 +48,14 @@ export class LessonsController {
       position?: number;
     },
   ) {
-    return this.lessonsService.updateLesson(req.user.id, id, dto);
+    return this.lessonsService.updateLesson(userId, id, dto);
   }
 
   @Delete('lessons/:id')
-  async deleteLesson(@Req() req, @Param('id') id: number) {
-    return this.lessonsService.deleteLesson(req.user.id, id);
+  async deleteLesson(
+    @CurrentUser('id') userId: number,
+    @Param('id') id: number,
+  ) {
+    return this.lessonsService.deleteLesson(userId, id);
   }
 }

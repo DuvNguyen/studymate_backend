@@ -15,6 +15,10 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
+import { Quiz } from '../../database/entities/quiz.entity';
+import { QuestionBank } from '../../database/entities/question-bank.entity';
+import { QuestionBankQuestion } from '../../database/entities/question-bank-question.entity';
+import type { SubmitAnswersPayload } from './quizzes.service';
 
 @Controller()
 @UseGuards(ClerkAuthGuard, RolesGuard)
@@ -53,7 +57,7 @@ export class QuizzesController {
   async submitQuiz(
     @CurrentUser() user: User,
     @Param('attemptId', ParseIntPipe) attemptId: number,
-    @Body() answers: any,
+    @Body() answers: SubmitAnswersPayload,
   ) {
     return this.quizzesService.submitAttempt(attemptId, user.id, answers);
   }
@@ -69,13 +73,16 @@ export class QuizzesController {
 
   @Post('instructor/quizzes')
   @Roles('INSTRUCTOR', 'ADMIN')
-  async createQuiz(@Body() data: any) {
+  async createQuiz(@Body() data: Partial<Quiz>) {
     return this.quizzesService.createQuiz(data);
   }
 
   @Put('instructor/quizzes/:id')
   @Roles('INSTRUCTOR', 'ADMIN')
-  async updateQuiz(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
+  async updateQuiz(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: Partial<Quiz>,
+  ) {
     return this.quizzesService.updateQuiz(id, data);
   }
 
@@ -95,7 +102,7 @@ export class QuizzesController {
 
   @Post('instructor/question-banks')
   @Roles('INSTRUCTOR', 'ADMIN')
-  async createBank(@Body() data: any) {
+  async createBank(@Body() data: Partial<QuestionBank>) {
     return this.quizzesService.createBank(data);
   }
 
@@ -109,7 +116,7 @@ export class QuizzesController {
   @Roles('INSTRUCTOR', 'ADMIN')
   async addQuestion(
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: any,
+    @Body() data: Partial<QuestionBankQuestion>,
   ) {
     return this.quizzesService.createQuestion(id, data);
   }
@@ -118,7 +125,7 @@ export class QuizzesController {
   @Roles('INSTRUCTOR', 'ADMIN')
   async updateQuestion(
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: any,
+    @Body() data: Partial<QuestionBankQuestion>,
   ) {
     return this.quizzesService.updateQuestion(id, data);
   }

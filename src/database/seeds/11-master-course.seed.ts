@@ -18,14 +18,20 @@ export async function seedMasterCourse(dataSource: DataSource) {
   const studentId = 65;
 
   // 1. Lấy Category phù hợp (DevOps & Cloud)
-  const category = await categoryRepo.findOne({ where: { slug: 'devops-cloud' } });
+  const category = await categoryRepo.findOne({
+    where: { slug: 'devops-cloud' },
+  });
   if (!category) {
-    console.log('Không tìm thấy category devops-cloud, bỏ qua seed master course.');
+    console.log(
+      'Không tìm thấy category devops-cloud, bỏ qua seed master course.',
+    );
     return;
   }
 
   // 2. Tạo Course
-  let course = await courseRepo.findOne({ where: { slug: 'master-linux-ubuntu' } });
+  let course = await courseRepo.findOne({
+    where: { slug: 'master-linux-ubuntu' },
+  });
   if (!course) {
     course = await courseRepo.save(
       courseRepo.create({
@@ -33,7 +39,8 @@ export async function seedMasterCourse(dataSource: DataSource) {
         categoryId: category.id,
         title: 'Master Linux - Ubuntu Desktop Masterclass 2026',
         slug: 'master-linux-ubuntu',
-        description: 'Khóa học thực chiến về Linux Ubuntu từ cài đặt đến bảo mật nâng cao.',
+        description:
+          'Khóa học thực chiến về Linux Ubuntu từ cài đặt đến bảo mật nâng cao.',
         price: 499000,
         originalPrice: 999000,
         level: CourseLevel.BEGINNER,
@@ -56,7 +63,9 @@ export async function seedMasterCourse(dataSource: DataSource) {
   // Trong thực tế seed thường chỉ thêm nếu chưa có, nhưng ở đây chúng ta muốn đảm bảo nội dung đúng
 
   // 4. Tạo Section 1
-  let section1 = await sectionRepo.findOne({ where: { courseId: course.id, position: 1 } });
+  let section1 = await sectionRepo.findOne({
+    where: { courseId: course.id, position: 1 },
+  });
   if (!section1) {
     section1 = await sectionRepo.save(
       sectionRepo.create({
@@ -68,7 +77,9 @@ export async function seedMasterCourse(dataSource: DataSource) {
   }
 
   // 5. Tạo Section 2
-  let section2 = await sectionRepo.findOne({ where: { courseId: course.id, position: 2 } });
+  let section2 = await sectionRepo.findOne({
+    where: { courseId: course.id, position: 2 },
+  });
   if (!section2) {
     section2 = await sectionRepo.save(
       sectionRepo.create({
@@ -112,10 +123,14 @@ export async function seedMasterCourse(dataSource: DataSource) {
   ];
 
   for (const data of lessonData) {
-    let lesson = await lessonRepo.findOne({ where: { sectionId: data.sectionId, title: data.title } });
-    
+    let lesson = await lessonRepo.findOne({
+      where: { sectionId: data.sectionId, title: data.title },
+    });
+
     // Tìm hoặc tạo Video thực thể
-    let video = await videoRepo.findOne({ where: { youtubeVideoId: data.ytId } });
+    let video = await videoRepo.findOne({
+      where: { youtubeVideoId: data.ytId },
+    });
     if (!video) {
       video = await videoRepo.save(
         videoRepo.create({

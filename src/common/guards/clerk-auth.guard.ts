@@ -6,14 +6,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verifyToken } from '@clerk/backend';
-import { Request } from 'express';
+import { AuthenticatedRequest } from '../types/authenticated-request.type';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
   constructor(private config: ConfigService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -34,12 +34,13 @@ export class ClerkAuthGuard implements CanActivate {
         ],
       });
 
-      (request as any).clerkUserId = payload.sub;
+      request.clerkUserId = payload.sub;
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : null;
       console.error('[ClerkAuthGuard] verifyToken FAILED!');
-      console.error('[ClerkAuthGuard] Error Name:', err?.name);
-      console.error('[ClerkAuthGuard] Error Message:', err?.message);
+      console.error('[ClerkAuthGuard] Error Name:', error?.name);
+      console.error('[ClerkAuthGuard] Error Message:', error?.message);
       console.error(
         '[ClerkAuthGuard] Token prefix:',
         token ? token.substring(0, 10) + '...' : 'NONE',

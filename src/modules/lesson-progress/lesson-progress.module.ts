@@ -8,7 +8,9 @@ import { Lesson } from '../../database/entities/lesson.entity';
 import { User } from '../../database/entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([LessonProgress, Enrollment, Lesson, User])],
+  imports: [
+    TypeOrmModule.forFeature([LessonProgress, Enrollment, Lesson, User]),
+  ],
   controllers: [LessonProgressController],
   providers: [LessonProgressService],
   exports: [LessonProgressService],

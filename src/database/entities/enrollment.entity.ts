@@ -10,6 +10,7 @@ import {
 import { User } from './user.entity';
 import { Course } from './course.entity';
 import { OrderItem } from './order-item.entity';
+import { RefundRequest } from './refund-request.entity';
 
 @Entity('enrollments')
 export class Enrollment {
@@ -65,6 +66,6 @@ export class Enrollment {
   @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
   completed_at: Date | null;
 
-  @OneToOne('RefundRequest', (refund: any) => refund.enrollment)
-  refund_request: any;
+  @OneToOne(() => RefundRequest, (refund) => refund.enrollment)
+  refund_request: RefundRequest;
 }

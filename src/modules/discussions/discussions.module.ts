@@ -10,7 +10,16 @@ import { Course } from '../../database/entities/course.entity';
 import { Lesson } from '../../database/entities/lesson.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([LessonDiscussion, DiscussionVote, Enrollment, User, Course, Lesson])],
+  imports: [
+    TypeOrmModule.forFeature([
+      LessonDiscussion,
+      DiscussionVote,
+      Enrollment,
+      User,
+      Course,
+      Lesson,
+    ]),
+  ],
   controllers: [DiscussionsController],
   providers: [DiscussionsService],
   exports: [DiscussionsService],

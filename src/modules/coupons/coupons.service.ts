@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Coupon, DiscountType } from '../../database/entities/coupon.entity';
@@ -19,14 +23,32 @@ export class CouponsService {
       where: { code: data.code },
     });
     if (existing) {
-      throw new BadRequestException('Mã giảm giá này đã tồn tại trong hệ thống. Vui lòng chọn tên khác.');
+      throw new BadRequestException(
+        'Mã giảm giá này đã tồn tại trong hệ thống. Vui lòng chọn tên khác.',
+      );
     }
     // ────────────────────────────────────────────────────────────
 
     // ── Monthly limit check ──────────────────────────────────────
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
+    const startOfNextMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
 
     const countThisMonth = await this.couponsRepo.count({
       where: {
@@ -76,13 +98,18 @@ export class CouponsService {
       throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
     }
     if (subtotal < Number(coupon.minOrderValue)) {
-      throw new BadRequestException(`Đơn hàng tối thiểu phải từ ₫${Number(coupon.minOrderValue).toLocaleString('vi-VN')} để sử dụng mã này`);
+      throw new BadRequestException(
+        `Đơn hàng tối thiểu phải từ ₫${Number(coupon.minOrderValue).toLocaleString('vi-VN')} để sử dụng mã này`,
+      );
     }
 
     let discountAmount = 0;
     if (coupon.discountType === DiscountType.PERCENTAGE) {
       discountAmount = (subtotal * Number(coupon.discountValue)) / 100;
-      if (coupon.maxDiscountAmount && discountAmount > Number(coupon.maxDiscountAmount)) {
+      if (
+        coupon.maxDiscountAmount &&
+        discountAmount > Number(coupon.maxDiscountAmount)
+      ) {
         discountAmount = Number(coupon.maxDiscountAmount);
       }
     } else {

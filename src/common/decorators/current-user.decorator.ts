@@ -1,11 +1,11 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { User } from '../../database/entities/user.entity';
+import { AuthenticatedRequest } from '../types/authenticated-request.type';
 
 // Dùng trong controller để lấy user hiện tại
 // Ví dụ: @Get('me') getMe(@CurrentUser() user: User) { ... }
 export const CurrentUser = createParamDecorator(
-  (data: string, ctx: ExecutionContext): any => {
-    const request = ctx.switchToHttp().getRequest();
+  (data: string | undefined, ctx: ExecutionContext): unknown => {
+    const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
     return data ? user?.[data] : user;
   },
@@ -13,8 +13,8 @@ export const CurrentUser = createParamDecorator(
 
 // Lấy clerkUserId thô từ token (trước khi resolve user từ DB)
 export const ClerkUserId = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): string => {
-    const request = ctx.switchToHttp().getRequest();
+  (_data: unknown, ctx: ExecutionContext): string | undefined => {
+    const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
     return request.clerkUserId;
   },
 );

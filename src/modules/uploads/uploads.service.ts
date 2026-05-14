@@ -7,7 +7,7 @@ import { Readable } from 'stream';
 export class UploadsService {
   constructor(@Inject('CLOUDINARY') private readonly cloudinaryConfig: any) {}
 
-  async uploadFile(file: any): Promise<CloudinaryResponse> {
+  async uploadFile(file: Express.Multer.File): Promise<CloudinaryResponse> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -21,8 +21,12 @@ export class UploadsService {
         (error, result) => {
           if (error) {
             console.error('Lỗi Cloudinary:', error);
+            const errorMessage =
+              error instanceof Error
+                ? error.message
+                : 'Unknown cloudinary error';
             return reject(
-              new BadRequestException('Lỗi tải ảnh: ' + error.message),
+              new BadRequestException('Lỗi tải ảnh: ' + errorMessage),
             );
           }
           resolve(result as unknown as CloudinaryResponse);

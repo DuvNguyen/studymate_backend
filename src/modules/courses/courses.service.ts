@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Course, CourseStatus, CourseLevel } from '../../database/entities/course.entity';
+import { Course, CourseStatus } from '../../database/entities/course.entity';
 import { Category } from '../../database/entities/category.entity';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
@@ -22,6 +28,8 @@ import {
   PaginationMetaDto,
 } from './dto/course-response.dto';
 import { RejectCourseDto } from './dto/course-approval.dto';
+
+type CourseWithQuizzes = Course & { quizzes?: Quiz[] };
 
 @Injectable()
 export class CoursesService {
@@ -64,25 +72,28 @@ export class CoursesService {
     // Calculate stats if not present (helpful for seeds or fresh courses)
     let calculatedDuration = course.totalDuration || 0;
     let calculatedLessonCount = course.lessonCount || 0;
-    
-    if (course.sections && (calculatedDuration === 0 || calculatedLessonCount === 0)) {
-        let total = 0;
-        let count = 0;
-        course.sections.forEach(s => {
-            if (s.lessons) {
-                s.lessons.forEach(l => {
-                    total += l.durationSecs || 0;
-                    count++;
-                });
-            }
-        });
-        calculatedDuration = total;
-        calculatedLessonCount = count;
+
+    if (
+      course.sections &&
+      (calculatedDuration === 0 || calculatedLessonCount === 0)
+    ) {
+      let total = 0;
+      let count = 0;
+      course.sections.forEach((s) => {
+        if (s.lessons) {
+          s.lessons.forEach((l) => {
+            total += l.durationSecs || 0;
+            count++;
+          });
+        }
+      });
+      calculatedDuration = total;
+      calculatedLessonCount = count;
     }
 
     dto.totalDuration = calculatedDuration;
     dto.lessonCount = calculatedLessonCount;
-    dto.sectionCount = course.sectionCount || (course.sections?.length || 0);
+    dto.sectionCount = course.sectionCount || course.sections?.length || 0;
     dto.studentCount = course.studentCount || 0;
     dto.avgRating = Number(course.avgRating);
     dto.reviewCount = course.reviewCount;
@@ -140,12 +151,14 @@ export class CoursesService {
 
     dto.previewVideo = course.previewVideo ?? null;
 
-    if ((course as any).quizzes) {
-      const allQuizzes = (course as any).quizzes as Quiz[];
-      dto.finalQuiz = allQuizzes.find(q => q.isFinal) || null;
-      
-      dto.sections.forEach(s => {
-        s.quiz = allQuizzes.find(q => q.sectionId === s.id && !q.isFinal) || null;
+    const courseWithQuizzes = course as CourseWithQuizzes;
+    if (courseWithQuizzes.quizzes) {
+      const allQuizzes = courseWithQuizzes.quizzes;
+      dto.finalQuiz = allQuizzes.find((q) => q.isFinal) || null;
+
+      dto.sections.forEach((s) => {
+        s.quiz =
+          allQuizzes.find((q) => q.sectionId === s.id && !q.isFinal) || null;
       });
     }
 
@@ -199,7 +212,12 @@ export class CoursesService {
 
     if (query.search) {
       // Use Meilisearch for search
-      const searchOptions: any = {
+      const searchOptions: {
+        limit: number;
+        offset: number;
+        filter: string[];
+        sort?: string[];
+      } = {
         limit,
         offset: skip,
         filter: [`status = "${CourseStatus.PUBLISHED}"`],
@@ -227,11 +245,17 @@ export class CoursesService {
       searchOptions.sort = [`${sortBy}:${sortOrder.toLowerCase()}`];
 
       console.log('Meilisearch Query:', query.search);
-      console.log('Meilisearch Options:', JSON.stringify(searchOptions, null, 2));
-      const searchResult = await this.searchService.searchCourses(query.search, searchOptions);
+      console.log(
+        'Meilisearch Options:',
+        JSON.stringify(searchOptions, null, 2),
+      );
+      const searchResult = await this.searchService.searchCourses(
+        query.search,
+        searchOptions,
+      );
       console.log('Meilisearch Results Count:', searchResult.hits.length);
-      
-      const total = (searchResult as any).totalHits || (searchResult as any).estimatedTotalHits || searchResult.hits.length || 0;
+
+      const total = searchResult.totalHits || searchResult.hits.length || 0;
       const meta = Object.assign(new PaginationMetaDto(), {
         total,
         page,
@@ -244,12 +268,19 @@ export class CoursesService {
       // But for consistency, let's fetch from DB or map documents if they have all info
       // To ensure relations like instructor/category are present, fetching from DB by IDs might be safer if documents are slim
       const courses = await this.coursesRepository.find({
-        where: { id: In(searchResult.hits.map(h => h.id)) },
+        where: { id: In(searchResult.hits.map((h) => h.id)) },
         relations: ['instructor', 'instructor.profile', 'category'],
       });
-      
+
       // Maintain order from search result
-      const orderedCourses = searchResult.hits.map(hit => courses.find(c => c.id === hit.id)).filter(Boolean);
+      const orderedCourses = searchResult.hits
+        .map((hit) => {
+          const hitId = hit.id;
+          return typeof hitId === 'number'
+            ? courses.find((c) => c.id === hitId)
+            : undefined;
+        })
+        .filter(Boolean);
 
       result.data = (orderedCourses as Course[]).map((c) => this.toDto(c));
       result.meta = meta;
@@ -450,10 +481,10 @@ export class CoursesService {
     }
 
     // Default exclude archived unless explicitly requested or getting all
+    const requestedStatus = query?.status;
     if (
-      !query?.status ||
-      (query.status !== 'ALL' &&
-        (query.status as any) !== CourseStatus.ARCHIVED)
+      !requestedStatus ||
+      (requestedStatus !== 'ALL' && String(requestedStatus) !== 'ARCHIVED')
     ) {
       qb.andWhere('course.status != :archivedStatus', {
         archivedStatus: CourseStatus.ARCHIVED,
@@ -558,7 +589,7 @@ export class CoursesService {
       level: dto.level,
     });
     const saved = await this.coursesRepository.save(course);
-    
+
     // Index in Meilisearch
     await this.searchService.indexCourse(this.toSearchDocument(saved));
 
@@ -577,7 +608,7 @@ export class CoursesService {
 
     Object.assign(course, dto);
     const saved = await this.coursesRepository.save(course);
-    
+
     // Update Meilisearch
     await this.searchService.indexCourse(this.toSearchDocument(saved));
 

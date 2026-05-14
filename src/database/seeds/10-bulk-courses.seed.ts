@@ -19,9 +19,6 @@ export async function seedBulkCourses(dataSource: DataSource) {
     });
   }
 
-  const allCategories = await categoryRepo.find({
-    where: { parentId: IsNull() },
-  }); // Hoặc lấy tất cả không phân biệt root. Tùy ý.
   // Thường category con mới được gán. Nên lấy những category có phụ huynh
   const subCategories = await categoryRepo.find({ where: { isActive: true } });
   const validCategories = subCategories.filter((c) => c.parentId !== null);

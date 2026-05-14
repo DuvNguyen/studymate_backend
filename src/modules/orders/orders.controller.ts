@@ -11,10 +11,7 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post('checkout')
-  checkout(
-    @CurrentUser() user: User,
-    @Body('couponCode') couponCode?: string,
-  ) {
+  checkout(@CurrentUser() user: User, @Body('couponCode') couponCode?: string) {
     return this.ordersService.checkoutParams(user, couponCode);
   }
 

@@ -12,6 +12,13 @@ import {
 import { Profile } from '../../database/entities/profile.entity';
 import { createClerkClient } from '@clerk/backend';
 
+interface ClerkUserLite {
+  firstName: string | null;
+  lastName: string | null;
+  imageUrl: string;
+  emailAddresses: Array<{ emailAddress: string }>;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -52,11 +59,11 @@ export class AuthService {
       );
     }
 
-    if (user.status === 'BANNED') {
+    if (user.status === UserStatus.BANNED) {
       throw new UnauthorizedException('Tài khoản đã bị khóa vĩnh viễn.');
     }
 
-    if (user.status === 'SUSPENDED') {
+    if (user.status === UserStatus.SUSPENDED) {
       throw new UnauthorizedException('Tài khoản đang bị tạm đình chỉ.');
     }
 
@@ -71,7 +78,7 @@ export class AuthService {
     const clerk = createClerkClient({
       secretKey: process.env.CLERK_SECRET_KEY,
     });
-    
+
     let needsUpdate = false;
     let firstName = '';
     let lastName = '';
@@ -105,8 +112,13 @@ export class AuthService {
         await this.userRepo.save(user);
         if (user.profile) await this.profileRepo.save(user.profile);
       }
-    } catch (error) {
-      console.warn(`[AuthService] Failed to sync with Clerk for ${clerkUserId}:`, error.message);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[AuthService] Failed to sync with Clerk for ${clerkUserId}:`,
+        errorMessage,
+      );
       // Fallback to local data
       fullName = user.profile?.fullName || user.email.split('@')[0];
     }
@@ -119,7 +131,8 @@ export class AuthService {
       role: user.role.roleName,
       status: user.status,
       firstName: firstName || user.profile?.fullName?.split(' ')[0] || '',
-      lastName: lastName || user.profile?.fullName?.split(' ').slice(1).join(' ') || '',
+      lastName:
+        lastName || user.profile?.fullName?.split(' ').slice(1).join(' ') || '',
       fullName: fullName,
       kycStatus: user.instructorProfile?.kycStatus || null,
       bankName: user.instructorProfile?.bankName || null,
@@ -147,12 +160,14 @@ export class AuthService {
     const clerk = createClerkClient({
       secretKey: process.env.CLERK_SECRET_KEY,
     });
-    let clerkUser: any;
+    let clerkUser: ClerkUserLite;
     try {
-      clerkUser = await clerk.users.getUser(clerkUserId);
-    } catch (error: any) {
+      clerkUser = (await clerk.users.getUser(clerkUserId)) as ClerkUserLite;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       throw new UnauthorizedException(
-        'Không thể xác thực info từ Clerk: ' + error.message,
+        'Không thể xác thực info từ Clerk: ' + errorMessage,
       );
     }
 
@@ -210,11 +225,13 @@ export class AuthService {
           await this.profileRepo.save(user.profile);
         }
       }
-    } catch (saveError: any) {
+    } catch (saveError: unknown) {
+      const errorMessage =
+        saveError instanceof Error ? saveError.message : String(saveError);
       // Nếu có lỗi tranh chấp (Webhook vừa tạo user xong), thử query lại lần nữa
       console.warn(
         `[AuthService] Onboard Race Condition detected for ${clerkUserId}:`,
-        saveError.message,
+        errorMessage,
       );
       user = await this.userRepo.findOne({
         where: [{ clerkUserId }, { email }],

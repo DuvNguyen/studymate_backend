@@ -1,13 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, In } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { OrderItem } from '../../database/entities/order-item.entity';
 import { Course } from '../../database/entities/course.entity';
 import { Category } from '../../database/entities/category.entity';
 import { Transaction } from '../../database/entities/transaction.entity';
 import { AnalyticsBridgeService } from './analytics-bridge.service';
-import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import {
+  startOfDay,
+  endOfDay,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  format,
+} from 'date-fns';
 
 @Injectable()
 export class StatisticsService {
@@ -16,7 +24,8 @@ export class StatisticsService {
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
     @InjectRepository(Course) private courseRepo: Repository<Course>,
     @InjectRepository(Category) private categoryRepo: Repository<Category>,
-    @InjectRepository(Transaction) private transactionRepo: Repository<Transaction>,
+    @InjectRepository(Transaction)
+    private transactionRepo: Repository<Transaction>,
     private analyticsBridge: AnalyticsBridgeService,
   ) {}
 
@@ -29,16 +38,16 @@ export class StatisticsService {
       .select('SUM(item.platform_fee)', 'sum')
       .where('order.status = :status', { status: OrderStatus.COMPLETED })
       .andWhere('order.created_at BETWEEN :start AND :end', { start, end })
-      .getRawOne();
-      
-    const totalRevenue = parseFloat(totalRevenueResult.sum || '0');
-    const orderCount = await this.orderRepo.count({ 
-      where: { 
+      .getRawOne<{ sum: string | null }>();
+
+    const totalRevenue = Number(totalRevenueResult?.sum ?? 0);
+    const orderCount = await this.orderRepo.count({
+      where: {
         status: OrderStatus.COMPLETED,
-        created_at: Between(start, end)
-      } 
+        created_at: Between(start, end),
+      },
     });
-    
+
     // MoM Growth (fixed for current month relative to last month)
     const thisMonthStart = startOfMonth(new Date());
     const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
@@ -50,34 +59,43 @@ export class StatisticsService {
       .select('SUM(item.platform_fee)', 'sum')
       .where('order.status = :status', { status: OrderStatus.COMPLETED })
       .andWhere('order.created_at >= :start', { start: thisMonthStart })
-      .getRawOne();
-    
-    const thisMonthRev = parseFloat(thisMonthRevResult.sum || '0');
+      .getRawOne<{ sum: string | null }>();
+
+    const thisMonthRev = Number(thisMonthRevResult?.sum ?? 0);
 
     const lastMonthRevResult = await this.orderItemRepo
       .createQueryBuilder('item')
       .innerJoin('item.order', 'order')
       .select('SUM(item.platform_fee)', 'sum')
       .where('order.status = :status', { status: OrderStatus.COMPLETED })
-      .andWhere('order.created_at BETWEEN :start AND :end', { start: lastMonthStart, end: lastMonthEnd })
-      .getRawOne();
-    
-    const lastMonthRev = parseFloat(lastMonthRevResult.sum || '0');
-    const growth = lastMonthRev === 0 ? 0 : ((thisMonthRev - lastMonthRev) / lastMonthRev) * 100;
+      .andWhere('order.created_at BETWEEN :start AND :end', {
+        start: lastMonthStart,
+        end: lastMonthEnd,
+      })
+      .getRawOne<{ sum: string | null }>();
+
+    const lastMonthRev = Number(lastMonthRevResult?.sum ?? 0);
+    const growth =
+      lastMonthRev === 0
+        ? 0
+        : ((thisMonthRev - lastMonthRev) / lastMonthRev) * 100;
 
     return {
       totalRevenue,
       orderCount,
       growth: Number(growth.toFixed(2)),
       thisMonthRevenue: thisMonthRev,
-      period: { start, end }
+      period: { start, end },
     };
   }
 
   async getRevenueChart(startDate?: string, endDate?: string, days?: number) {
     const { start, end } = this.getDateRange(startDate, endDate, days || 30);
-    const diffDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-    
+    const diffDays = Math.max(
+      1,
+      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+
     // Optimized single query for the entire period - summing platform_fee
     const rawData = await this.orderItemRepo
       .createQueryBuilder('item')
@@ -88,14 +106,14 @@ export class StatisticsService {
       .andWhere('order.created_at BETWEEN :start AND :end', { start, end })
       .groupBy("TO_CHAR(order.created_at, 'YYYY-MM-DD')")
       .orderBy("TO_CHAR(order.created_at, 'YYYY-MM-DD')", 'ASC')
-      .getRawMany();
+      .getRawMany<{ date: string | null; sum: string | null }>();
 
     // Map raw data for easy lookup - Ensure we use trimmed string keys
-    const dataMap = new Map();
-    rawData.forEach(row => {
+    const dataMap = new Map<string, number>();
+    rawData.forEach((row) => {
       const ds = row.date ? String(row.date).trim() : null;
       if (ds) {
-        dataMap.set(ds, parseFloat(row.sum));
+        dataMap.set(ds, Number(row.sum ?? 0));
       }
     });
 
@@ -106,7 +124,7 @@ export class StatisticsService {
       const val = dataMap.get(ds);
       result.push({
         ds,
-        y: val !== undefined ? val : 0
+        y: val !== undefined ? val : 0,
       });
     }
     return result;
@@ -127,45 +145,53 @@ export class StatisticsService {
       .andWhere('order.created_at BETWEEN :start AND :end', { start, end })
       .groupBy('category.id')
       .addGroupBy('category.name')
-      .getRawMany();
+      .getRawMany<{ id: string; name: string; value: string }>();
 
-    return rawData.map(row => ({
-      id: parseInt(row.id),
+    return rawData.map((row) => ({
+      id: Number(row.id),
       name: row.name,
-      value: parseFloat(row.value)
+      value: Number(row.value),
     }));
   }
 
   async getAnalyticsSummary(startDate?: string, endDate?: string) {
     const { start, end } = this.getDateRange(startDate, endDate);
-    
+
     // Use the requested range for forecasting input
     const history = await this.getRevenueChart(
       format(subDays(start, 30), 'yyyy-MM-dd'), // Include some history before the start
-      format(end, 'yyyy-MM-dd')
+      format(end, 'yyyy-MM-dd'),
     );
-    
+
     const forecast = await this.analyticsBridge.getRevenueForecast(history, 30);
-    const anomalies = await this.analyticsBridge.detectAnomalies(history.slice(-90));
-    
+    const anomalies = await this.analyticsBridge.detectAnomalies(
+      history.slice(-90),
+    );
+
     const categories = await this.getCategoryDistribution(startDate, endDate);
-    const rankingItems = categories.map(c => ({
+    const rankingItems = categories.map((c) => ({
       category_id: c.id,
       name: c.name,
-      revenue_history: [c.value]
+      revenue_history: [c.value],
     }));
     const ranking = await this.analyticsBridge.getCategoryRanking(rankingItems);
 
     return {
       forecast,
       anomalies,
-      ranking
+      ranking,
     };
   }
 
-  private getDateRange(startDate?: string, endDate?: string, defaultDays?: number) {
+  private getDateRange(
+    startDate?: string,
+    endDate?: string,
+    defaultDays?: number,
+  ) {
     let start: Date;
-    let end: Date = endDate ? endOfDay(new Date(endDate)) : endOfDay(new Date());
+    const end: Date = endDate
+      ? endOfDay(new Date(endDate))
+      : endOfDay(new Date());
 
     if (startDate) {
       start = startOfDay(new Date(startDate));

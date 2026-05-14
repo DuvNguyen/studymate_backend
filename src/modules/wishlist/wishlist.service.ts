@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wishlist } from '../../database/entities/wishlist.entity';
@@ -41,8 +37,8 @@ export class WishlistService {
 
       // Map fullName từ profile sang instructor DTO (vì DTO mong đợi flattened field)
       if (dto.course && dto.course.instructor) {
-        dto.course.instructor.fullName =
-          (item.course.instructor as any)?.profile?.fullName ?? null;
+        const instructorProfileName = item.course.instructor.profile?.fullName;
+        dto.course.instructor.fullName = instructorProfileName ?? null;
       }
 
       return dto;

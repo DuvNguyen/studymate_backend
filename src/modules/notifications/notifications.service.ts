@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Notification, NotificationType } from '../../database/entities/notification.entity';
+import {
+  Notification,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 
 @Injectable()
 export class NotificationsService {
@@ -17,7 +20,13 @@ export class NotificationsService {
     });
   }
 
-  async sendNotification(userId: number, type: NotificationType, title: string, message: string, metadata?: any) {
+  async sendNotification(
+    userId: number,
+    type: NotificationType,
+    title: string,
+    message: string,
+    metadata?: Record<string, unknown>,
+  ) {
     const notification = this.notificationsRepo.create({
       userId,
       type,
@@ -42,7 +51,10 @@ export class NotificationsService {
   }
 
   async markAllAsRead(userId: number) {
-    await this.notificationsRepo.update({ userId, isRead: false }, { isRead: true });
+    await this.notificationsRepo.update(
+      { userId, isRead: false },
+      { isRead: true },
+    );
     return { success: true };
   }
 }

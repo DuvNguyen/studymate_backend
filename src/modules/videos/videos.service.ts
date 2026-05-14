@@ -10,7 +10,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { google, youtube_v3 } from 'googleapis';
 import { Readable } from 'stream';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -18,10 +18,7 @@ import { Video, VideoStatus } from '../../database/entities/video.entity';
 import { VideoResponseDto } from './dto/video-response.dto';
 import { YoutubeUtils } from './utils/youtube-utils';
 import { VideoQueryDto } from './dto/video-query.dto';
-import {
-  PaginatedVideosDto,
-  PaginationMetaDto,
-} from './dto/paginated-videos.dto';
+import { PaginatedVideosDto } from './dto/paginated-videos.dto';
 
 @Injectable()
 export class VideosService {
@@ -146,9 +143,14 @@ export class VideosService {
     const limit = query.limit ?? 5;
     const skip = (page - 1) * limit;
 
-    const whereCondition: any = { uploaderId: instructorId };
-    if (query.status) {
-      whereCondition.status = query.status;
+    const whereCondition: FindOptionsWhere<Video> = {
+      uploaderId: instructorId,
+    };
+    if (
+      query.status &&
+      (Object.values(VideoStatus) as string[]).includes(query.status)
+    ) {
+      whereCondition.status = query.status as VideoStatus;
     }
 
     const [videos, total] = await this.videosRepository.findAndCount({
@@ -267,11 +269,13 @@ export class VideosService {
           id: video.youtubeVideoId,
         });
         this.logger.log(`Đã xóa video ${video.youtubeVideoId} trên YouTube`);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown YouTube error';
         // Log lỗi nhưng không chặn việc xóa DB nếu YouTube lỗi (có thể video đã bị xóa trước đó)
         this.logger.error(
           `Lỗi khi xóa video ${video.youtubeVideoId} trên YouTube:`,
-          err.message,
+          errorMessage,
         );
       }
     }
@@ -300,7 +304,9 @@ export class VideosService {
   async autoValidateVideos() {
     if (this.isCronRunning) return;
 
-    const hasWork = await this.cacheManager.get<boolean>('has_processing_videos');
+    const hasWork = await this.cacheManager.get<boolean>(
+      'has_processing_videos',
+    );
     if (hasWork === false) return;
 
     this.isCronRunning = true;
@@ -319,68 +325,73 @@ export class VideosService {
         `Tự động kiểm tra ${pendingVideos.length} video đang PROCESSING (Auto-Validation)...`,
       );
 
-    for (const video of pendingVideos) {
-      if (!video.youtubeVideoId) continue;
+      for (const video of pendingVideos) {
+        if (!video.youtubeVideoId) continue;
 
-      try {
-        const metadata = await this.fetchMetadata(video.youtubeVideoId);
-        if (!metadata || !metadata.contentDetails || !metadata.status) continue;
+        try {
+          const metadata = await this.fetchMetadata(video.youtubeVideoId);
+          if (!metadata || !metadata.contentDetails || !metadata.status)
+            continue;
 
-        const uploadStatus = metadata.status.uploadStatus;
-        if (uploadStatus === 'failed' || uploadStatus === 'rejected') {
-          video.status = VideoStatus.REJECTED;
-          video.rejectReason = `YouTube xử lý thất bại hoặc từ chối: ${metadata.status?.rejectionReason || uploadStatus}`;
-          await this.videosRepository.save(video);
-          this.logger.log(
-            `Video #${video.id} bị REJECTED vì YouTube uploadStatus: ${uploadStatus}`,
-          );
-          continue;
-        }
-
-        const durationSecs = YoutubeUtils.parseDurationToSeconds(
-          metadata.contentDetails.duration,
-        );
-        const definition = metadata.contentDetails.definition; // 'hd' or 'sd'
-
-        video.durationSecs = durationSecs;
-        video.definition = definition ?? null;
-
-        // Luật kỹ thuật: độ dài từ 2 phút đến 120 phút
-        if (durationSecs < 120 || durationSecs > 7200) {
-          video.status = VideoStatus.REJECTED;
-          video.rejectReason = `Video của bạn đã bị từ chối do vi phạm chất lượng và độ dài (your video was rejected due to quality and length violation) - Độ dài yêu cầu: 2-120 phút.`;
-        } else if (definition === 'hd') {
-          video.status = VideoStatus.PENDING_REVIEW;
-        } else {
-          // Nếu định dạng SD, hệ thống đợi tối đa 30 phút.
-          // (Lưu ý: trên Test có thể sửa số 30 thành ngắn hơn)
-          const diffMinutes =
-            (Date.now() - video.uploadedAt.getTime()) / (1000 * 60);
-          if (diffMinutes > 30) {
+          const uploadStatus = metadata.status.uploadStatus;
+          if (uploadStatus === 'failed' || uploadStatus === 'rejected') {
             video.status = VideoStatus.REJECTED;
-            video.rejectReason =
-              'Video bị từ chối do vi phạm quy định chất lượng: Video chưa đạt phân giải HD sau 30 phút xử lý.';
-          } else {
-            // Chưa đủ 30p, vẫn giữ PROCESSING để đợi
+            video.rejectReason = `YouTube xử lý thất bại hoặc từ chối: ${metadata.status?.rejectionReason || uploadStatus}`;
+            await this.videosRepository.save(video);
             this.logger.log(
-              `Video #${video.id} đang xử lý định dạng (đang SD, đã đợi ${Math.round(diffMinutes)} phút)`,
+              `Video #${video.id} bị REJECTED vì YouTube uploadStatus: ${uploadStatus}`,
+            );
+            continue;
+          }
+
+          const durationSecs = YoutubeUtils.parseDurationToSeconds(
+            metadata.contentDetails.duration,
+          );
+          const definition = metadata.contentDetails.definition; // 'hd' or 'sd'
+
+          video.durationSecs = durationSecs;
+          video.definition = definition ?? null;
+
+          // Luật kỹ thuật: độ dài từ 2 phút đến 120 phút
+          if (durationSecs < 120 || durationSecs > 7200) {
+            video.status = VideoStatus.REJECTED;
+            video.rejectReason = `Video của bạn đã bị từ chối do vi phạm chất lượng và độ dài (your video was rejected due to quality and length violation) - Độ dài yêu cầu: 2-120 phút.`;
+          } else if (definition === 'hd') {
+            video.status = VideoStatus.PENDING_REVIEW;
+          } else {
+            // Nếu định dạng SD, hệ thống đợi tối đa 30 phút.
+            // (Lưu ý: trên Test có thể sửa số 30 thành ngắn hơn)
+            const diffMinutes =
+              (Date.now() - video.uploadedAt.getTime()) / (1000 * 60);
+            if (diffMinutes > 30) {
+              video.status = VideoStatus.REJECTED;
+              video.rejectReason =
+                'Video bị từ chối do vi phạm quy định chất lượng: Video chưa đạt phân giải HD sau 30 phút xử lý.';
+            } else {
+              // Chưa đủ 30p, vẫn giữ PROCESSING để đợi
+              this.logger.log(
+                `Video #${video.id} đang xử lý định dạng (đang SD, đã đợi ${Math.round(diffMinutes)} phút)`,
+              );
+            }
+          }
+
+          await this.videosRepository.save(video);
+          if (video.status !== VideoStatus.PROCESSING) {
+            this.logger.log(
+              `Video #${video.id} hoàn tất Auto-Validation: chuyển sang ${video.status}`,
             );
           }
-        }
-
-        await this.videosRepository.save(video);
-        if (video.status !== VideoStatus.PROCESSING) {
-          this.logger.log(
-            `Video #${video.id} hoàn tất Auto-Validation: chuyển sang ${video.status}`,
+        } catch (err: unknown) {
+          const errorMessage =
+            err instanceof Error
+              ? err.message
+              : 'Unknown Auto-Validation error';
+          this.logger.error(
+            `Lỗi Auto-Validation cho Video #${video.id}:`,
+            errorMessage,
           );
         }
-      } catch (err: any) {
-        this.logger.error(
-          `Lỗi Auto-Validation cho Video #${video.id}:`,
-          err.message,
-        );
       }
-    }
     } finally {
       this.isCronRunning = false;
     }

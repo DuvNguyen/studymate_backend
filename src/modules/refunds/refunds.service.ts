@@ -1,7 +1,14 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
-import { RefundRequest, RefundStatus } from '../../database/entities/refund-request.entity';
+import {
+  RefundRequest,
+  RefundStatus,
+} from '../../database/entities/refund-request.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { Transaction } from '../../database/entities/transaction.entity';
@@ -37,7 +44,9 @@ export class RefundsService {
     }
 
     if (!enrollment.is_active) {
-      throw new BadRequestException('Khóa học này đã bị khóa hoặc đã được hoàn tiền');
+      throw new BadRequestException(
+        'Khóa học này đã bị khóa hoặc đã được hoàn tiền',
+      );
     }
 
     // ── Rule 30/30 Check ──
@@ -51,7 +60,9 @@ export class RefundsService {
     }
 
     if (enrollment.progress_percent > 30) {
-      throw new BadRequestException(`Tiến độ học tập hiện tại là ${enrollment.progress_percent}%, vượt quá mức cho phép (30%) để hoàn tiền`);
+      throw new BadRequestException(
+        `Tiến độ học tập hiện tại là ${enrollment.progress_percent}%, vượt quá mức cho phép (30%) để hoàn tiền`,
+      );
     }
 
     // Check if a request already exists
@@ -59,7 +70,9 @@ export class RefundsService {
       where: { enrollment_id: dto.enrollmentId, status: RefundStatus.PENDING },
     });
     if (existing) {
-      throw new BadRequestException('Bạn đã gửi yêu cầu hoàn tiền cho khóa học này và đang chờ duyệt');
+      throw new BadRequestException(
+        'Bạn đã gửi yêu cầu hoàn tiền cho khóa học này và đang chờ duyệt',
+      );
     }
 
     const refundRequest = this.refundRequestsRepo.create({
@@ -75,7 +88,7 @@ export class RefundsService {
     });
 
     await this.refundRequestsRepo.save(refundRequest);
-    
+
     // 1. Notify Student
     await this.notificationsService.sendNotification(
       userId,
@@ -112,13 +125,24 @@ export class RefundsService {
     });
   }
 
-  async processRefund(adminId: number, requestId: number, dto: ProcessRefundDto) {
+  async processRefund(
+    adminId: number,
+    requestId: number,
+    dto: ProcessRefundDto,
+  ) {
     const refundRequest = await this.refundRequestsRepo.findOne({
       where: { id: requestId },
-      relations: ['enrollment', 'enrollment.order_item', 'enrollment.course', 'student', 'course'],
+      relations: [
+        'enrollment',
+        'enrollment.order_item',
+        'enrollment.course',
+        'student',
+        'course',
+      ],
     });
 
-    if (!refundRequest) throw new NotFoundException('Không tìm thấy yêu cầu hoàn tiền');
+    if (!refundRequest)
+      throw new NotFoundException('Không tìm thấy yêu cầu hoàn tiền');
     if (refundRequest.status !== RefundStatus.PENDING) {
       throw new BadRequestException('Yêu cầu này đã được xử lý trước đó');
     }
@@ -139,30 +163,34 @@ export class RefundsService {
         const enrollment = refundRequest.enrollment;
         enrollment.is_active = false;
         enrollment.revoked_at = new Date();
-        enrollment.revoke_reason = 'REFUNDED: ' + (dto.adminNote || 'No reason provided');
+        enrollment.revoke_reason =
+          'REFUNDED: ' + (dto.adminNote || 'No reason provided');
         await queryRunner.manager.save(enrollment);
 
         // 2. Adjust Instructor Wallet
         const instructorId = enrollment.order_item.instructor_id;
-        const instructorAmount = Number(enrollment.order_item.instructor_amount);
-        
+        const instructorAmount = Number(
+          enrollment.order_item.instructor_amount,
+        );
+
         const wallet = await queryRunner.manager.findOne(Wallet, {
           where: { user_id: instructorId },
         });
 
         if (wallet) {
           // Subtract from pending and total earned
-          wallet.balance_pending = Number(wallet.balance_pending) - instructorAmount;
+          wallet.balance_pending =
+            Number(wallet.balance_pending) - instructorAmount;
           wallet.total_earned = Number(wallet.total_earned) - instructorAmount;
           await queryRunner.manager.save(wallet);
 
           // Find the original EARNING transaction to cancel it if it's still locked
           const originalTx = await queryRunner.manager.findOne(Transaction, {
-            where: { 
-              order_item_id: enrollment.order_item_id, 
+            where: {
+              order_item_id: enrollment.order_item_id,
               transaction_type: 'EARNING',
-              status: 'LOCKED'
-            }
+              status: 'LOCKED',
+            },
           });
 
           if (originalTx) {
@@ -171,7 +199,8 @@ export class RefundsService {
           }
 
           // Total balance after deduction for audit
-          const totalBalanceAfter = Number(wallet.balance_available) + Number(wallet.balance_pending);
+          const totalBalanceAfter =
+            Number(wallet.balance_available) + Number(wallet.balance_pending);
 
           // Create REFUND transaction for instructor record
           const refundTx = queryRunner.manager.create(Transaction, {

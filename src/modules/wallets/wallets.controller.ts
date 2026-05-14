@@ -13,7 +13,6 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
-import { Multer } from 'multer';
 import { WalletsService } from './wallets.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -42,7 +41,11 @@ export class WalletsController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
   ) {
-    return this.walletsService.getTransactionHistory(userId, Number(page), Number(limit));
+    return this.walletsService.getTransactionHistory(
+      userId,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Get('me/payouts')
@@ -86,7 +89,10 @@ export class WalletsController {
 
   @Post('payouts/export-csv')
   @Roles('ADMIN', 'STAFF')
-  async exportPayoutsCsv(@Body() body: { ids: number[] }, @Res() res: Response) {
+  async exportPayoutsCsv(
+    @Body() body: { ids: number[] },
+    @Res() res: Response,
+  ) {
     const csv = await this.walletsService.exportPayoutsCsv(body.ids);
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader(
