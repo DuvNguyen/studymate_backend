@@ -32,6 +32,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { SearchModule } from './modules/search/search.module';
+import { CourseStatsSubscriber } from './database/subscribers/course-stats.subscriber';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { SearchModule } from './modules/search/search.module';
             connectionTimeoutMillis: 30000,
             idleTimeoutMillis: 30000,
           },
+          subscribers: [CourseStatsSubscriber],
         };
       },
     }),

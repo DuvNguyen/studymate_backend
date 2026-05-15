@@ -26,14 +26,14 @@ async function bootstrap() {
       ...frontendUrls,
       'http://localhost:3000',
       'http://127.0.0.1:3000',
-      'http://localhost:3001', // cho chính nó nếu cần
+      'http://localhost:3001',
       'http://127.0.0.1:3001',
-      'https://studymate-frontend-xi.vercel.app',
+      'https://studymatelms.vercel.app',
     ],
     credentials: true,
   });
 
-  // Prefix cho toàn bộ API
+  // Prefix for all APIs
   app.setGlobalPrefix('api/v1');
 
   // Validation tự động cho DTO

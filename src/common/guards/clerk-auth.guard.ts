@@ -26,10 +26,7 @@ export class ClerkAuthGuard implements CanActivate {
       .split(',')
       .map((origin) => normalizeOrigin(origin))
       .filter(Boolean);
-    const authorizedParties = [
-      'http://localhost:3000',
-      ...frontendOrigins,
-    ];
+    const authorizedParties = ['http://localhost:3000', ...frontendOrigins];
 
     try {
       // verifyToken() với jwtKey = PEM public key từ Clerk Dashboard

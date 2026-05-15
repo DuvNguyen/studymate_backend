@@ -19,6 +19,7 @@ export class WishlistService {
   ) {}
 
   async findAll(studentId: number): Promise<WishlistResponseDto[]> {
+    console.log('[WishlistService.findAll] querying by studentId', studentId);
     const items = await this.wishlistRepository.find({
       where: { studentId },
       relations: [
@@ -29,6 +30,7 @@ export class WishlistService {
       ],
       order: { addedAt: 'DESC' },
     });
+    console.log('[WishlistService.findAll] raw rows', items.length);
 
     return items.map((item) => {
       const dto = plainToInstance(WishlistResponseDto, item, {

@@ -69,34 +69,12 @@ export class CoursesService {
     dto.language = course.language;
     dto.level = course.level;
     dto.status = course.status;
-    // Calculate stats if not present (helpful for seeds or fresh courses)
-    let calculatedDuration = course.totalDuration || 0;
-    let calculatedLessonCount = course.lessonCount || 0;
-
-    if (
-      course.sections &&
-      (calculatedDuration === 0 || calculatedLessonCount === 0)
-    ) {
-      let total = 0;
-      let count = 0;
-      course.sections.forEach((s) => {
-        if (s.lessons) {
-          s.lessons.forEach((l) => {
-            total += l.durationSecs || 0;
-            count++;
-          });
-        }
-      });
-      calculatedDuration = total;
-      calculatedLessonCount = count;
-    }
-
-    dto.totalDuration = calculatedDuration;
-    dto.lessonCount = calculatedLessonCount;
-    dto.sectionCount = course.sectionCount || course.sections?.length || 0;
+    dto.totalDuration = course.totalDuration || 0;
+    dto.lessonCount = course.lessonCount || 0;
+    dto.sectionCount = course.sectionCount || 0;
     dto.studentCount = course.studentCount || 0;
-    dto.avgRating = Number(course.avgRating);
-    dto.reviewCount = course.reviewCount;
+    dto.avgRating = Number(course.avgRating) || 0;
+    dto.reviewCount = course.reviewCount || 0;
     dto.publishedAt = course.publishedAt ?? null;
     dto.createdAt = course.createdAt;
 
@@ -272,17 +250,14 @@ export class CoursesService {
         relations: ['instructor', 'instructor.profile', 'category'],
       });
 
-      // Maintain order from search result
-      const orderedCourses = searchResult.hits
+      // Maintain order and map to DTOs
+      const idToCourseMap = new Map(courses.map((c) => [c.id, c]));
+      result.data = searchResult.hits
         .map((hit) => {
-          const hitId = hit.id;
-          return typeof hitId === 'number'
-            ? courses.find((c) => c.id === hitId)
-            : undefined;
+          const course = idToCourseMap.get(hit.id as number);
+          return course ? this.toDto(course) : null;
         })
-        .filter(Boolean);
-
-      result.data = (orderedCourses as Course[]).map((c) => this.toDto(c));
+        .filter((c): c is CourseResponseDto => !!c);
       result.meta = meta;
       return result;
     }

@@ -20,7 +20,14 @@ export class WishlistController {
 
   @Get()
   async findAll(@CurrentUser() user: User) {
+    console.log('[WishlistController.findAll] request user', {
+      id: user?.id,
+      clerkUserId: user?.clerkUserId,
+      email: user?.email,
+      role: user?.role?.roleName,
+    });
     const data = await this.wishlistService.findAll(user.id);
+    console.log('[WishlistController.findAll] response count', data.length);
     return { data, message: 'Lấy danh sách yêu thích thành công' };
   }
 
