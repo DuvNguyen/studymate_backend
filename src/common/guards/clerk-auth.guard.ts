@@ -21,6 +21,15 @@ export class ClerkAuthGuard implements CanActivate {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    const normalizeOrigin = (value: string) => value.trim().replace(/\/+$/, '');
+    const frontendOrigins = (this.config.get<string>('FRONTEND_URL') || '')
+      .split(',')
+      .map((origin) => normalizeOrigin(origin))
+      .filter(Boolean);
+    const authorizedParties = [
+      'http://localhost:3000',
+      ...frontendOrigins,
+    ];
 
     try {
       // verifyToken() với jwtKey = PEM public key từ Clerk Dashboard
@@ -28,10 +37,7 @@ export class ClerkAuthGuard implements CanActivate {
       // → hacker không thể forge token dù biết userId
       const payload = await verifyToken(token, {
         jwtKey: this.config.get<string>('CLERK_JWT_KEY'),
-        authorizedParties: [
-          'http://localhost:3000',
-          this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000',
-        ],
+        authorizedParties,
       });
 
       request.clerkUserId = payload.sub;
