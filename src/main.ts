@@ -16,15 +16,19 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS — cho phép frontend gọi API
-  const frontendUrl =
-    config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+  const normalizeOrigin = (value: string) => value.trim().replace(/\/+$/, '');
+  const frontendUrls = (config.get<string>('FRONTEND_URL') || '')
+    .split(',')
+    .map((url) => normalizeOrigin(url))
+    .filter(Boolean);
   app.enableCors({
     origin: [
-      frontendUrl,
+      ...frontendUrls,
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:3001', // cho chính nó nếu cần
       'http://127.0.0.1:3001',
+      'https://studymate-frontend-xi.vercel.app',
     ],
     credentials: true,
   });
