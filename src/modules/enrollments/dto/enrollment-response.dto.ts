@@ -15,6 +15,9 @@ export class CourseShortResponseDto {
 
   @Expose()
   slug: string;
+
+  @Expose()
+  status: string;
 }
 export class OrderItemShortDto {
   @Expose()
@@ -33,6 +36,15 @@ export class RefundRequestShortDto {
 
   @Expose()
   created_at: Date;
+
+  @Expose()
+  admin_note: string;
+
+  @Expose()
+  processed_at: Date;
+
+  @Expose()
+  processed_by_id: number;
 }
 
 export class EnrollmentResponseDto {

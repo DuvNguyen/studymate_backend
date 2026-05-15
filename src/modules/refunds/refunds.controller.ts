@@ -39,8 +39,12 @@ export class RefundsController {
 
   @Get('admin/all')
   @Roles('ADMIN', 'STAFF')
-  getAllRequests(@Query('status') status?: RefundStatus) {
-    return this.refundsService.getRefundRequests(status);
+  getAllRequests(
+    @Query('status') status?: RefundStatus,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.refundsService.getRefundRequests(status, dateFrom, dateTo);
   }
 
   @Post('admin/:id/process')

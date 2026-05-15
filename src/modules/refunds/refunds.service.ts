@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, Between } from 'typeorm';
 import {
   RefundRequest,
   RefundStatus,
@@ -117,11 +117,24 @@ export class RefundsService {
     return refundRequest;
   }
 
-  async getRefundRequests(status?: RefundStatus) {
+  async getRefundRequests(
+    status?: RefundStatus,
+    dateFrom?: string,
+    dateTo?: string,
+  ) {
+    const where: Record<string, unknown> = {};
+    if (status) where.status = status;
+    if (dateFrom && dateTo) {
+      where.created_at = Between(
+        new Date(`${dateFrom}T00:00:00.000Z`),
+        new Date(`${dateTo}T23:59:59.999Z`),
+      );
+    }
+
     return this.refundRequestsRepo.find({
-      where: status ? { status } : {},
+      where,
       order: { created_at: 'DESC' },
-      relations: ['student', 'course', 'enrollment'],
+      relations: ['student', 'course', 'enrollment', 'processed_by'],
     });
   }
 
@@ -258,7 +271,7 @@ export class RefundsService {
     return this.refundRequestsRepo.find({
       where: { student_id: userId },
       order: { created_at: 'DESC' },
-      relations: ['course'],
+      relations: ['course', 'processed_by'],
     });
   }
 }
