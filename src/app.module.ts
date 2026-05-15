@@ -66,12 +66,16 @@ import { SearchModule } from './modules/search/search.module';
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
-      useFactory: async (config: ConfigService) => ({
-        store: await redisStore({
-          url: `redis://${config.get<string>('REDIS_HOST', 'localhost')}:${config.get<string>('REDIS_PORT', '6379')}`,
-        }),
-        ttl: parseInt(config.get('REDIS_TTL', '3600'), 10) * 1000,
-      }),
+      useFactory: async (config: ConfigService) => {
+        // Support Upstash REDIS_URL (rediss://...) or local REDIS_HOST/PORT
+        const redisUrl =
+          config.get<string>('REDIS_URL') ||
+          `redis://${config.get<string>('REDIS_HOST', 'localhost')}:${config.get<string>('REDIS_PORT', '6379')}`;
+        return {
+          store: await redisStore({ url: redisUrl }),
+          ttl: parseInt(config.get('REDIS_TTL', '3600'), 10) * 1000,
+        };
+      },
     }),
 
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),

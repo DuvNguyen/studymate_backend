@@ -8,19 +8,53 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+
+      # Database (Neon PostgreSQL)
       - key: DATABASE_URL
-        sync: false5
+        sync: false
+
+      # Clerk Auth
       - key: CLERK_SECRET_KEY
         sync: false
       - key: CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_WEBHOOK_SECRET
         sync: false
+      - key: CLERK_JWT_KEY
+        sync: false
+
+      # Cloudinary
       - key: CLOUDINARY_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+
+      # YouTube Data API
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REFRESH_TOKEN
+        sync: false
+
+      # Redis (Upstash — set REDIS_URL to the full rediss:// URL from Upstash dashboard)
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        value: "6379"
+      - key: REDIS_TTL
+        value: "3600"
+
+      # Meilisearch Cloud
+      - key: MEILISEARCH_HOST
+        sync: false
+      - key: MEILISEARCH_API_KEY
+        sync: false
+
+      # App
       - key: FRONTEND_URL
         sync: false
