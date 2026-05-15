@@ -11,7 +11,6 @@ import { Course } from '../entities/course.entity';
 
 @EventSubscriber()
 export class CourseStatsSubscriber implements EntitySubscriberInterface {
-
   async afterInsert(event: InsertEvent<Lesson | Section>) {
     await this.updateCourseStats(event);
   }
@@ -52,7 +51,8 @@ export class CourseStatsSubscriber implements EntitySubscriberInterface {
   ) {
     const manager = event.manager;
     const entity = event.entity;
-    const databaseEntity = 'databaseEntity' in event ? event.databaseEntity : undefined;
+    const databaseEntity =
+      'databaseEntity' in event ? event.databaseEntity : undefined;
     let courseId: number | undefined;
 
     // Type narrowing to find courseId
@@ -66,12 +66,12 @@ export class CourseStatsSubscriber implements EntitySubscriberInterface {
       courseId = entity.courseId;
     } else if (this.isLesson(databaseEntity)) {
       const section = await manager.findOne(Section, {
-        where: { id: (databaseEntity as Lesson).sectionId },
+        where: { id: databaseEntity.sectionId },
         select: ['courseId'],
       });
       courseId = section?.courseId;
     } else if (this.isSection(databaseEntity)) {
-      courseId = (databaseEntity as Section).courseId;
+      courseId = databaseEntity.courseId;
     }
 
     if (!courseId) return;

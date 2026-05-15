@@ -6,6 +6,7 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import { CacheTTL } from '@nestjs/cache-manager';
 import { EnrollmentsService } from './enrollments.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -20,6 +21,7 @@ export class EnrollmentsController {
   constructor(private readonly enrollmentsService: EnrollmentsService) {}
 
   @Get('my-courses')
+  @CacheTTL(0)
   async getMyCourses(
     @CurrentUser() user: User,
   ): Promise<EnrollmentResponseDto[]> {
@@ -27,6 +29,7 @@ export class EnrollmentsController {
   }
 
   @Get('my-purchases')
+  @CacheTTL(0)
   async getMyPurchases(
     @CurrentUser() user: User,
   ): Promise<EnrollmentResponseDto[]> {
