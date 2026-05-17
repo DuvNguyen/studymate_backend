@@ -46,7 +46,8 @@ import { CourseStatsSubscriber } from './database/subscribers/course-stats.subsc
         const host = dbUrl.split('@')[1]?.split('/')[0] || 'unknown';
         console.log(`[Database] Connecting to: ${host}`);
 
-        const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+        const isLocal =
+          host.includes('localhost') || host.includes('127.0.0.1');
 
         return {
           type: 'postgres',

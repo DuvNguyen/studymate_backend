@@ -4,7 +4,6 @@ import { Role } from '../entities/role.entity';
 import { StaffProfile } from '../entities/staff-profile.entity';
 import { Profile } from '../entities/profile.entity';
 
-
 export async function seedUsers(dataSource: DataSource) {
   const userRepo = dataSource.getRepository(User);
   const roleRepo = dataSource.getRepository(Role);
@@ -81,7 +80,6 @@ export async function seedUsers(dataSource: DataSource) {
               : 'Nguyễn Thị Bích Nguyễn',
         });
       }
-
     } else {
       // Đảm bảo user cũ cũng có profile
       const profileRepo = dataSource.getRepository(Profile);
@@ -98,9 +96,7 @@ export async function seedUsers(dataSource: DataSource) {
             phoneNumber: '0123456789',
           });
         }
-      } else if (
-        data.email === 'nguyen.van.an@studymate.vn'
-      ) {
+      } else if (data.email === 'nguyen.van.an@studymate.vn') {
         const profile = await profileRepo.findOne({
           where: { userId: existing.id },
         });

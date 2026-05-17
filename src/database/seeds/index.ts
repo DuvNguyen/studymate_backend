@@ -35,7 +35,6 @@ import { DiscussionVote } from '../entities/discussion-vote.entity';
 import { Notification } from '../entities/notification.entity';
 import { RefundRequest } from '../entities/refund-request.entity';
 
-
 import { seedRoles } from './01-roles.seed';
 import { seedUsers } from './02-users.seed';
 import { seedCategories } from './03-categories.seed';
@@ -100,7 +99,6 @@ async function runSeeds() {
   await seedRoles(dataSource);
   await seedUsers(dataSource);
   await seedCategories(dataSource);
-
 
   console.log('\n2. Khởi tạo KHÓA HỌC MASTER (Linux Ubuntu)...');
   await seedMasterCourse(dataSource);

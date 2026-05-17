@@ -35,7 +35,6 @@ export async function seedMasterCourse(dataSource: DataSource) {
   const instructorId = instructor.id;
   const studentId = student.id;
 
-
   // 1. Lấy Category phù hợp (DevOps & Cloud)
   const category = await categoryRepo.findOne({
     where: { slug: 'devops-cloud' },
