@@ -76,3 +76,9 @@ __pycache__/
 .tox/
 .nox/
 .cache/
+
+# GitNexus
+.gitnexus/
+
+# Database backups
+*.sql
