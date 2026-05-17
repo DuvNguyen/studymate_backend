@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
@@ -45,10 +46,30 @@ async function bootstrap() {
     }),
   );
 
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('StudyMate API')
+    .setDescription('StudyMate backend API documentation')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'bearer',
+    )
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, swaggerDocument);
+
+  // Kích hoạt shutdown hooks để đóng các kết nối DB một cách an toàn khi restart/shutdown
+  app.enableShutdownHooks();
+
   const port = config.get<number>('PORT') || 3001;
   await app.listen(port);
 
   console.log(` Backend đang chạy tại http://localhost:${port}/api/v1`);
+  console.log(` Swagger docs: http://localhost:${port}/docs`);
 }
 
 void bootstrap();

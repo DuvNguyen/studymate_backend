@@ -30,9 +30,16 @@ import { Quiz } from '../entities/quiz.entity';
 import { QuizAttempt } from '../entities/quiz-attempt.entity';
 import { Payout } from '../entities/payout.entity';
 import { Review } from '../entities/review.entity';
+import { Coupon } from '../entities/coupon.entity';
+import { DiscussionVote } from '../entities/discussion-vote.entity';
+import { Notification } from '../entities/notification.entity';
+import { RefundRequest } from '../entities/refund-request.entity';
+
 
 import { seedRoles } from './01-roles.seed';
+import { seedUsers } from './02-users.seed';
 import { seedCategories } from './03-categories.seed';
+
 import { seedTransactions } from './07-transactions.seed';
 import { seedQuestionBanks } from './09-question-banks.seed';
 import { seedMasterCourse } from './11-master-course.seed';
@@ -73,8 +80,13 @@ const dataSource = new DataSource({
     QuizAttempt,
     Payout,
     Review,
+    Coupon,
+    DiscussionVote,
+    Notification,
+    RefundRequest,
   ],
-  synchronize: false, // Tắt synchronize để tránh lỗi drop/alter table
+
+  synchronize: true, // Bật để tự tạo bảng còn thiếu ở local
 });
 
 async function runSeeds() {
@@ -86,8 +98,9 @@ async function runSeeds() {
 
   console.log('1. Đảm bảo vai trò & danh mục đã tồn tại...');
   await seedRoles(dataSource);
+  await seedUsers(dataSource);
   await seedCategories(dataSource);
-  // await seedUsers(dataSource); // Có thể bỏ qua nếu user đã có
+
 
   console.log('\n2. Khởi tạo KHÓA HỌC MASTER (Linux Ubuntu)...');
   await seedMasterCourse(dataSource);

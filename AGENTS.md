@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **studymate-backend** (2275 symbols, 4458 relationships, 62 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **studymate_backend** (2543 symbols, 7016 relationships, 135 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -20,23 +20,14 @@ This project is indexed by GitNexus as **studymate-backend** (2275 symbols, 4458
 - NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
 - NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
 
-## Type Safety & Constants
-
-- **Tuyệt đối không dùng magic strings** cho các giá trị định danh, role, permission, status. Không viết trực tiếp kiểu `'INSTRUCTOR'`, `'ADMIN'`, `'PUBLISHED'` trong business logic.
-- **Ưu tiên Enum hoặc readonly constant object** và tái sử dụng từ một nguồn duy nhất.
-- **Centralization**: mọi hằng số logic đặt trong `src/common/constants/` hoặc `src/types/` (single source of truth).
-- **Strict typing tại nguồn**: khai báo kiểu rõ ở Entity/DTO/Interface, không đợi đến nơi sử dụng mới ép kiểu bằng `String(...)`.
-- **Hạn chế ép kiểu thủ công**: không dùng `any`, `String()`, `as string` trừ tình huống bắt buộc khi tích hợp dữ liệu bên thứ ba chưa có schema.
-- **Naming convention**: tên Enum/constant object dùng PascalCase (`UserStatus`), value dùng SCREAMING_SNAKE_CASE (`ACTIVE_ACCOUNT`).
-
 ## Resources
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/studymate-backend/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/studymate-backend/clusters` | All functional areas |
-| `gitnexus://repo/studymate-backend/processes` | All execution flows |
-| `gitnexus://repo/studymate-backend/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/studymate_backend/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/studymate_backend/clusters` | All functional areas |
+| `gitnexus://repo/studymate_backend/processes` | All execution flows |
+| `gitnexus://repo/studymate_backend/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 

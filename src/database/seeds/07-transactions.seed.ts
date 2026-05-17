@@ -4,6 +4,7 @@ import { Order, OrderStatus } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Wallet } from '../entities/wallet.entity';
 import { Transaction } from '../entities/transaction.entity';
+import { User } from '../entities/user.entity';
 
 export async function seedTransactions(dataSource: DataSource) {
   const courseRepo = dataSource.getRepository(Course);
@@ -11,6 +12,7 @@ export async function seedTransactions(dataSource: DataSource) {
   const orderItemRepo = dataSource.getRepository(OrderItem);
   const walletRepo = dataSource.getRepository(Wallet);
   const transactionRepo = dataSource.getRepository(Transaction);
+  const userRepo = dataSource.getRepository(User);
 
   // 1. Tìm khóa học Master Linux
   const course = await courseRepo.findOne({
@@ -23,8 +25,24 @@ export async function seedTransactions(dataSource: DataSource) {
     return;
   }
 
-  const instructorId = course.instructorId; // 62
-  const studentId = 65; // Học viên mẫu theo yêu cầu
+  // Tìm các user theo email thay vì hardcode ID
+  const studentUser = await userRepo.findOne({
+    where: { email: 'le.minh.duc@gmail.com' },
+  });
+  const adminUser = await userRepo.findOne({
+    where: { email: 'admin@studymate.vn' },
+  });
+
+  if (!studentUser || !adminUser) {
+    console.error(
+      'Lỗi: Không tìm thấy Student hoặc Admin mẫu. Hãy đảm bảo seedUsers đã chạy thành công.',
+    );
+    return;
+  }
+
+  const instructorId = course.instructorId;
+  const studentId = studentUser.id;
+  const adminId = adminUser.id;
 
   console.log(
     `Bắt đầu seed giao dịch cho Course ID ${course.id} (Instructor ${instructorId}, Student ${studentId})`,
@@ -50,11 +68,11 @@ export async function seedTransactions(dataSource: DataSource) {
     );
   }
 
-  let systemWallet = await walletRepo.findOne({ where: { user_id: 1 } });
+  let systemWallet = await walletRepo.findOne({ where: { user_id: adminId } });
   if (!systemWallet) {
     systemWallet = await walletRepo.save(
       walletRepo.create({
-        user_id: 1,
+        user_id: adminId,
         balance_pending: 0,
         balance_available: 0,
         total_earned: 0,

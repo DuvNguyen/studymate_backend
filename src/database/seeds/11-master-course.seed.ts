@@ -6,7 +6,10 @@ import { Video, VideoStatus } from '../entities/video.entity';
 import { Category } from '../entities/category.entity';
 import { Enrollment } from '../entities/enrollment.entity';
 
+import { User } from '../entities/user.entity';
+
 export async function seedMasterCourse(dataSource: DataSource) {
+  const userRepo = dataSource.getRepository(User);
   const courseRepo = dataSource.getRepository(Course);
   const sectionRepo = dataSource.getRepository(Section);
   const lessonRepo = dataSource.getRepository(Lesson);
@@ -14,8 +17,24 @@ export async function seedMasterCourse(dataSource: DataSource) {
   const categoryRepo = dataSource.getRepository(Category);
   const enrollmentRepo = dataSource.getRepository(Enrollment);
 
-  const instructorId = 62;
-  const studentId = 65;
+  // Tìm Instructor và Student từ seed dữ liệu đã tạo
+  const instructor = await userRepo.findOne({
+    where: { email: 'nguyen.van.an@studymate.vn' },
+  });
+  const student = await userRepo.findOne({
+    where: { email: 'le.minh.duc@gmail.com' },
+  });
+
+  if (!instructor || !student) {
+    console.error(
+      'Lỗi: Không tìm thấy Instructor hoặc Student mẫu. Hãy đảm bảo seedUsers đã chạy thành công.',
+    );
+    return;
+  }
+
+  const instructorId = instructor.id;
+  const studentId = student.id;
+
 
   // 1. Lấy Category phù hợp (DevOps & Cloud)
   const category = await categoryRepo.findOne({

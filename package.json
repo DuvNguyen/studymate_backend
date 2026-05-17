@@ -30,6 +30,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.1.1",
+    "@nestjs/swagger": "^11.4.3",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "cache-manager": "^7.2.8",
@@ -48,6 +49,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "svix": "^1.88.0",
+    "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.28"
   },
   "devDependencies": {

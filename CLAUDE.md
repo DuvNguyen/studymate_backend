@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **studymate-backend** (2275 symbols, 4458 relationships, 62 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **studymate_backend** (2543 symbols, 7016 relationships, 135 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -24,10 +24,10 @@ This project is indexed by GitNexus as **studymate-backend** (2275 symbols, 4458
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/studymate-backend/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/studymate-backend/clusters` | All functional areas |
-| `gitnexus://repo/studymate-backend/processes` | All execution flows |
-| `gitnexus://repo/studymate-backend/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/studymate_backend/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/studymate_backend/clusters` | All functional areas |
+| `gitnexus://repo/studymate_backend/processes` | All execution flows |
+| `gitnexus://repo/studymate_backend/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 

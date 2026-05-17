@@ -1,6 +1,9 @@
 import { DataSource } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
+import { StaffProfile } from '../entities/staff-profile.entity';
+import { Profile } from '../entities/profile.entity';
+
 
 export async function seedUsers(dataSource: DataSource) {
   const userRepo = dataSource.getRepository(User);
@@ -62,50 +65,53 @@ export async function seedUsers(dataSource: DataSource) {
 
       // Tạo profile cho user mới
       if (data.email === 'admin@studymate.vn') {
-        const staffRepo = dataSource.getRepository('staff_profiles');
+        const staffRepo = dataSource.getRepository(StaffProfile);
         await staffRepo.save({
-          user_id: newUser.id,
-          full_name: 'StudyMate Admin',
+          userId: newUser.id,
+          fullName: 'StudyMate Admin',
           phoneNumber: '0123456789',
         });
       } else if (data.email.includes('instructor')) {
-        const profileRepo = dataSource.getRepository('profiles');
+        const profileRepo = dataSource.getRepository(Profile);
         await profileRepo.save({
-          user_id: newUser.id,
-          full_name:
+          userId: newUser.id,
+          fullName:
             data.email === 'nguyen.van.an@studymate.vn'
               ? 'Nguyễn Văn An'
               : 'Nguyễn Thị Bích Nguyễn',
         });
       }
+
     } else {
-      // Đảm bảo user cũ cũng có profile (Đặc biệt cho user 1 và 62 đã có sẵn)
-      const profileRepo = dataSource.getRepository('profiles');
+      // Đảm bảo user cũ cũng có profile
+      const profileRepo = dataSource.getRepository(Profile);
 
       if (data.email === 'admin@studymate.vn') {
         const profile = await profileRepo.findOne({
-          where: { user_id: existing.id },
+          where: { userId: existing.id },
         });
         if (!profile) {
-          await profileRepo.save({
-            user_id: existing.id,
+          const staffRepo = dataSource.getRepository(StaffProfile);
+          await staffRepo.save({
+            userId: existing.id,
             fullName: 'StudyMate System',
+            phoneNumber: '0123456789',
           });
         }
       } else if (
-        data.email === 'giangvien2@gmail.com' ||
         data.email === 'nguyen.van.an@studymate.vn'
       ) {
         const profile = await profileRepo.findOne({
-          where: { user_id: existing.id },
+          where: { userId: existing.id },
         });
         if (!profile) {
           await profileRepo.save({
-            user_id: existing.id,
+            userId: existing.id,
             fullName: 'Giảng Viên Master',
           });
         }
       }
+
       console.log(`  User đã tồn tại: ${data.email}`);
     }
   }

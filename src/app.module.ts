@@ -32,6 +32,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { SearchModule } from './modules/search/search.module';
+import { HealthModule } from './modules/health/health.module';
 import { CourseStatsSubscriber } from './database/subscribers/course-stats.subscriber';
 
 @Module({
@@ -45,19 +46,18 @@ import { CourseStatsSubscriber } from './database/subscribers/course-stats.subsc
         const host = dbUrl.split('@')[1]?.split('/')[0] || 'unknown';
         console.log(`[Database] Connecting to: ${host}`);
 
+        const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+
         return {
           type: 'postgres',
           url: dbUrl,
-          ssl: true,
+          ssl: isLocal ? false : { rejectUnauthorized: false },
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: isLocal, // Cho phép tự động tạo bảng ở local để tiện test
           logging: config.get('NODE_ENV') === 'development',
           extra: {
-            ssl: {
-              rejectUnauthorized: false,
-            },
-            max: 10,
-            connectionTimeoutMillis: 30000,
+            max: 5,
+            connectionTimeoutMillis: 20000,
             idleTimeoutMillis: 30000,
           },
           subscribers: [CourseStatsSubscriber],
@@ -106,6 +106,7 @@ import { CourseStatsSubscriber } from './database/subscribers/course-stats.subsc
     RefundsModule,
     StatisticsModule,
     SearchModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
