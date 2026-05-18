@@ -155,16 +155,8 @@ export class CoursesService {
     const limit = query.limit ?? 9;
     const skip = (page - 1) * limit;
 
-    const qb = this.coursesRepository
-      .createQueryBuilder('course')
-      .leftJoinAndSelect('course.instructor', 'instructor')
-      .leftJoinAndSelect('instructor.profile', 'profile')
-      .leftJoinAndSelect('course.category', 'category')
-      .where('course.status = :status', { status: CourseStatus.PUBLISHED });
-
+    let categoryIds: number[] | null = null;
     if (query.categorySlug) {
-      // Tìm cả courses thuộc sub-category của category được chọn
-      // Trước tiên tìm category theo slug, rồi lấy id của nó và các children
       const cat = await this.categoriesRepository.findOne({
         where: { slug: query.categorySlug, isActive: true },
         relations: ['children'],
@@ -184,8 +176,7 @@ export class CoursesService {
       }
 
       // Lấy id của category và tất cả children (nếu là root category)
-      const categoryIds = [cat.id, ...cat.children.map((c) => c.id)];
-      qb.andWhere('course.categoryId IN (:...categoryIds)', { categoryIds });
+      categoryIds = [cat.id, ...cat.children.map((c) => c.id)];
     }
 
     if (query.search) {
@@ -205,16 +196,8 @@ export class CoursesService {
         searchOptions.filter.push(`level = "${query.level}"`);
       }
 
-      if (query.categorySlug) {
-        // We need category ID for filtering in Meilisearch
-        const cat = await this.categoriesRepository.findOne({
-          where: { slug: query.categorySlug, isActive: true },
-          relations: ['children'],
-        });
-        if (cat) {
-          const categoryIds = [cat.id, ...cat.children.map((c) => c.id)];
-          searchOptions.filter.push(`categoryId IN [${categoryIds.join(',')}]`);
-        }
+      if (categoryIds && categoryIds.length > 0) {
+        searchOptions.filter.push(`categoryId IN [${categoryIds.join(',')}]`);
       }
 
       // Sorting
@@ -262,28 +245,62 @@ export class CoursesService {
       return result;
     }
 
+    const baseQb = this.coursesRepository
+      .createQueryBuilder('course')
+      .where('course.status = :status', { status: CourseStatus.PUBLISHED });
+
+    if (categoryIds && categoryIds.length > 0) {
+      baseQb.andWhere('course.categoryId IN (:...categoryIds)', {
+        categoryIds,
+      });
+    }
+
     if (query.level) {
-      qb.andWhere('course.level = :level', { level: query.level });
+      baseQb.andWhere('course.level = :level', { level: query.level });
     }
 
     // Dynamic Sorting
     const sortBy = query.sortBy || 'publishedAt';
     const sortOrder = query.sortOrder || 'DESC';
 
+    const orderedIdsQb = baseQb.clone().select('course.id', 'id');
+
     if (sortBy === 'publishedAt') {
-      qb.orderBy('course.publishedAt', sortOrder).addOrderBy(
-        'course.createdAt',
-        sortOrder,
-      );
+      orderedIdsQb
+        .orderBy('course.publishedAt', sortOrder)
+        .addOrderBy('course.createdAt', sortOrder);
     } else {
-      qb.orderBy(`course.${sortBy}`, sortOrder);
+      orderedIdsQb.orderBy(`course.${sortBy}`, sortOrder);
       // Secondary sort for stability
-      qb.addOrderBy('course.publishedAt', 'DESC');
+      orderedIdsQb.addOrderBy('course.publishedAt', 'DESC');
     }
 
-    qb.skip(skip).take(limit);
+    const total = await baseQb.clone().getCount();
 
-    const [courses, total] = await qb.getManyAndCount();
+    const rows = await orderedIdsQb
+      .skip(skip)
+      .take(limit)
+      .getRawMany<{ id: string | number }>();
+
+    const ids = rows.map((r) => Number(r.id));
+
+    let courses: Course[] = [];
+    if (ids.length > 0) {
+      const hydratedCourses = await this.coursesRepository
+        .createQueryBuilder('course')
+        .leftJoinAndSelect('course.instructor', 'instructor')
+        .leftJoinAndSelect('instructor.profile', 'profile')
+        .leftJoinAndSelect('course.category', 'category')
+        .where('course.id IN (:...ids)', { ids })
+        .getMany();
+
+      const courseById = new Map(
+        hydratedCourses.map((course) => [course.id, course]),
+      );
+      courses = ids
+        .map((id) => courseById.get(id))
+        .filter((course): course is Course => !!course);
+    }
 
     const meta = Object.assign(new PaginationMetaDto(), {
       total,

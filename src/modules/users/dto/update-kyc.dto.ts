@@ -4,6 +4,9 @@ import {
   IsArray,
   ValidateNested,
   IsEnum,
+  IsNotEmpty,
+  Matches,
+  ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { DocumentType } from '../../../database/entities/instructor-document.entity';
@@ -15,9 +18,11 @@ export class InstructorDocumentDto {
   @IsEnum(DocumentType)
   documentType: DocumentType;
 
+  @IsNotEmpty()
   @IsString()
   title: string;
 
+  @IsNotEmpty()
   @IsString()
   fileUrl: string;
 }
@@ -26,6 +31,7 @@ export class CertificateDto {
   @IsOptional()
   id?: number;
 
+  @IsNotEmpty()
   @IsString()
   title: string;
 
@@ -35,27 +41,28 @@ export class CertificateDto {
 }
 
 export class UpdateKycDto {
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  idCardUrl?: string;
+  idCardUrl: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  bankAccountName?: string;
+  bankAccountName: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  bankAccountNumber?: string;
+  @Matches(/^\d{8,20}$/)
+  bankAccountNumber: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  bankName?: string;
+  bankName: string;
 
-  @IsOptional()
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => InstructorDocumentDto)
-  documents?: InstructorDocumentDto[];
+  documents: InstructorDocumentDto[];
 
   @IsOptional()
   @IsArray()

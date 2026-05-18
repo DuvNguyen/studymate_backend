@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -107,6 +108,36 @@ export class UsersService {
 
   private isStudentRole(roleName?: string | null): boolean {
     return roleName === STUDENT_ROLE || roleName === LEGACY_STUDENT_ROLE;
+  }
+
+  private validateKycPayload(dto: UpdateKycDto): void {
+    const errors: string[] = [];
+    if (!dto.idCardUrl?.trim()) errors.push('idCardUrl là bắt buộc');
+    if (!dto.bankAccountName?.trim())
+      errors.push('bankAccountName là bắt buộc');
+    if (!dto.bankName?.trim()) errors.push('bankName là bắt buộc');
+    if (!/^\d{8,20}$/.test((dto.bankAccountNumber || '').trim())) {
+      errors.push('bankAccountNumber phải là 8-20 chữ số');
+    }
+    if (!Array.isArray(dto.documents) || dto.documents.length === 0) {
+      errors.push('documents phải có ít nhất 1 mục');
+    }
+    dto.documents?.forEach((doc, index) => {
+      if (!doc.title?.trim()) {
+        errors.push(`documents[${index}].title không được để trống`);
+      }
+      if (!doc.fileUrl?.trim()) {
+        errors.push(`documents[${index}].fileUrl không được để trống`);
+      }
+    });
+    dto.certificates?.forEach((cert, index) => {
+      if (!cert.title?.trim()) {
+        errors.push(`certificates[${index}].title không được để trống`);
+      }
+    });
+    if (errors.length > 0) {
+      throw new BadRequestException(errors);
+    }
   }
 
   async findOneByClerkId(clerkUserId: string): Promise<User | null> {
@@ -218,7 +249,7 @@ export class UsersService {
   }
 
   async updateInstructorKyc(clerkUserId: string, dto: UpdateKycDto) {
-    console.log('updateInstructorKyc DTO:', JSON.stringify(dto, null, 2));
+    this.validateKycPayload(dto);
     const user = await this.userRepo.findOne({
       where: { clerkUserId },
       relations: ['instructorProfile', 'instructorDocuments'],

@@ -259,6 +259,9 @@ export class AuthService {
       }
     }
 
-    return { role: requestRole };
+    return {
+      role: requestRole,
+      intendedRole: targetRole === 'INSTRUCTOR' ? 'INSTRUCTOR' : 'STUDENT',
+    };
   }
 }
