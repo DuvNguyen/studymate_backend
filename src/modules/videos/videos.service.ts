@@ -176,11 +176,19 @@ export class VideosService {
     const limit = query.limit ?? 5;
     const skip = (page - 1) * limit;
 
+    const moderationStatuses = [
+      VideoStatus.PENDING_REVIEW,
+      VideoStatus.APPROVED,
+      VideoStatus.REJECTED,
+    ];
+
     const qb = this.videosRepository
       .createQueryBuilder('video')
       .leftJoinAndSelect('video.uploader', 'uploader')
       .leftJoinAndSelect('uploader.profile', 'profile')
-      .where('video.status = :status', { status: VideoStatus.PENDING_REVIEW });
+      .where('video.status IN (:...statuses)', {
+        statuses: moderationStatuses,
+      });
 
     if (query.uploaderId) {
       qb.andWhere('video.uploaderId = :uploaderId', {
@@ -192,7 +200,11 @@ export class VideosService {
       qb.andWhere('video.id = :id', { id: query.id });
     }
 
-    if (query.status && query.status !== 'ALL') {
+    if (
+      query.status &&
+      query.status !== 'ALL' &&
+      moderationStatuses.includes(query.status as VideoStatus)
+    ) {
       qb.andWhere('video.status = :customStatus', {
         customStatus: query.status,
       });
@@ -201,6 +213,41 @@ export class VideosService {
     qb.orderBy('video.uploadedAt', 'ASC').skip(skip).take(limit);
 
     const [videos, total] = await qb.getManyAndCount();
+
+    // Best-effort backfill technical fields for older rows missing metadata.
+    for (const video of videos) {
+      if (!video.youtubeVideoId) continue;
+      if (video.durationSecs && video.definition && video.fileSizeKb) continue;
+
+      try {
+        const metadata = await this.fetchMetadata(video.youtubeVideoId);
+        if (!metadata?.contentDetails) continue;
+
+        if (!video.durationSecs && metadata.contentDetails.duration) {
+          video.durationSecs = YoutubeUtils.parseDurationToSeconds(
+            metadata.contentDetails.duration,
+          );
+        }
+
+        if (!video.definition && metadata.contentDetails.definition) {
+          video.definition = metadata.contentDetails.definition;
+        }
+
+        const rawFileSize = metadata.fileDetails?.fileSize;
+        if (!video.fileSizeKb && rawFileSize) {
+          const bytes = Number(rawFileSize);
+          if (!Number.isNaN(bytes) && bytes > 0) {
+            video.fileSizeKb = Math.round(bytes / 1024);
+          }
+        }
+
+        await this.videosRepository.save(video);
+      } catch (err) {
+        this.logger.warn(
+          `Không thể backfill metadata cho video #${video.id}: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        );
+      }
+    }
 
     return {
       data: videos.map((v) => {
@@ -291,7 +338,7 @@ export class VideosService {
    */
   async fetchMetadata(youtubeVideoId: string) {
     const response = await this.youtube.videos.list({
-      part: ['contentDetails', 'status'],
+      part: ['contentDetails', 'status', 'fileDetails'],
       id: [youtubeVideoId],
     });
     return response.data.items?.[0];

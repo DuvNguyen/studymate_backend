@@ -25,6 +25,11 @@ export class AdminCoursesController {
     return this.coursesService.findAllForAdmin(query);
   }
 
+  @Get(':id')
+  async getCourseDetail(@Param('id') id: string) {
+    return this.coursesService.findByIdForAdmin(parseInt(id, 10));
+  }
+
   @Put(':id/suspend')
   async suspendCourse(@Param('id') id: string, @Body() dto: RejectCourseDto) {
     return this.coursesService.suspendCourse(parseInt(id, 10), dto);

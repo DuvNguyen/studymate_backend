@@ -688,6 +688,23 @@ export class CoursesService {
     return result;
   }
 
+  async findByIdForAdmin(id: number): Promise<CourseResponseDto> {
+    const course = await this.coursesRepository.findOne({
+      where: { id },
+      relations: [
+        'instructor',
+        'instructor.profile',
+        'category',
+        'sections',
+        'sections.lessons',
+        'sections.lessons.video',
+      ],
+    });
+
+    if (!course) throw new NotFoundException('Không tìm thấy khóa học');
+    return this.toDto(course);
+  }
+
   async approveCourse(id: number): Promise<CourseResponseDto> {
     const course = await this.coursesRepository.findOne({ where: { id } });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
