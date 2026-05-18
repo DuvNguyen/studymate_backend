@@ -1,109 +1,149 @@
-# StudyMate - Backend API
+# StudyMate Backend
 
-StudyMate là hệ thống quản lý học tập (LMS) hiện đại, hỗ trợ đa vai trò người dùng và quy trình làm việc chuyên nghiệp giữa Học viên, Giảng viên và Quản trị viên. Đây là kho lưu trữ mã nguồn cho phần Backend của hệ thống.
+Backend API cho hệ thống StudyMate LMS, xây dựng bằng NestJS, cung cấp nghiệp vụ cho học viên, giảng viên, staff và admin.
 
-## 🚀 Công nghệ sử dụng
+## Tổng quan kỹ thuật
 
-Hệ thống được xây dựng trên nền tảng NestJS với kiến trúc mạnh mẽ và có khả năng mở rộng:
+- Framework: NestJS `11`
+- Runtime: Node.js
+- ORM: TypeORM `0.3`
+- Database: PostgreSQL (hỗ trợ Neon)
+- Cache: Redis qua `cache-manager-redis-yet`
+- Auth: Clerk (`@clerk/backend`)
+- Search: Meilisearch
+- Storage: Cloudinary
+- API docs: Swagger tại `/docs`
+- API prefix: `/api/v1`
 
-- **Framework**: [NestJS 11+](https://nestjs.com/) (Node.js)
-- **Database**: [PostgreSQL](https://www.postgresql.org/) (Sử dụng [Neon DB](https://neon.tech/))
-- **ORM**: [TypeORM](https://typeorm.io/)
-- **Authentication**: [Clerk Auth](https://clerk.com/) (JWT & Social Login)
-- **Media Storage**: [Cloudinary](https://cloudinary.com/)
-- **Webhook Integration**: [Svix](https://www.svix.com/) (Xác thực chữ ký Clerk Webhook)
-- **Security**: Helmet, Throttler, CORS, ValidationPipe
-- **Video Hosting**: YouTube Data API v3 (Centralized Channel)
+## Kiến trúc và xử lý request
 
-## 🏗️ Kiến trúc Hệ thống
+Luồng chính:
 
-Backend tuân thủ nghiêm ngặt mô hình Layered Architecture:
+`Request -> Guard -> Controller -> Service -> TypeORM -> PostgreSQL`
 
-```text
-Request (JWT) -> Guard (Roles) -> Controller -> Service -> Repository -> Database
-```
+Cấu hình toàn cục hiện tại:
 
-- **ClerkAuthGuard**: Xác thực token JWT từ Clerk và gán thông tin người dùng vào request.
-- **Service Pattern**: Chứa 100% logic nghiệp vụ. Không query trực tiếp trong controller.
-- **Repository Pattern**: Quản lý các thao tác với cơ sở dữ liệu và khai báo các quan hệ (relations).
-- **DTO (Data Transfer Objects)**: Sử dụng `class-validator` để kiểm soát dữ liệu input/output.
+- `ValidationPipe` với `whitelist`, `transform`, `forbidNonWhitelisted`
+- `helmet` cho HTTP security headers
+- `ThrottlerGuard` global (`100` requests / `60s`)
+- `CacheInterceptor` global
+- `TransformInterceptor` global
+- `HttpExceptionFilter` global
+- CORS theo `FRONTEND_URL` (danh sách phân tách dấu phẩy) + localhost + domain deploy
 
-## 📂 Các Module Chính
+## Module nghiệp vụ
 
-- `auth`: Xử lý xác thực và đồng bộ người dùng từ Clerk qua Webhooks.
-- `users`: Quản lý thông tin cá nhân, hồ sơ Giảng viên (KYC), và Staff.
-- `categories`: Hệ thống danh mục khóa học phân cấp đa tầng.
-- `courses`: Quản lý khóa học, lộ trình học tập và phê duyệt.
-- `lessons`: Bài học, nội dung chi tiết và media.
-- `quizzes`: Hệ thống bài kiểm tra và đánh giá học viên.
-- `orders & enrollments`: Quy trình thanh toán, tạo đơn hàng và ghi danh khóa học.
-- `wallets`: Quản lý số dư và doanh thu cho Giảng viên.
-- `uploads`: Module dùng chung để xử lý file lên Cloudinary.
-- `search`: Tích hợp Meilisearch cho tìm kiếm hiệu năng cao trên Courses và Users.
+Các module đang có trong `src/modules`:
 
-## 🔍 Hệ thống Tìm kiếm (Meilisearch)
+- `auth`
+- `users`
+- `categories`
+- `courses`
+- `sections`
+- `lessons`
+- `videos`
+- `quizzes`
+- `lesson-progress`
+- `discussions`
+- `reviews`
+- `search`
+- `carts`
+- `orders`
+- `enrollments`
+- `wishlist`
+- `coupons`
+- `wallets`
+- `refunds`
+- `statistics`
+- `notifications`
+- `uploads`
+- `health`
 
-Hệ thống sử dụng **Meilisearch** để cung cấp trải nghiệm tìm kiếm tức thì và chịu lỗi chính tả.
+## Luồng nghiệp vụ tiêu biểu (GitNexus)
 
-### 1. Cơ sở lý thuyết & Kiến trúc
-Chúng tôi sử dụng kĩ thuật **Application Layer Hooks**:
-- Khi dữ liệu được lưu vào DB (PostgreSQL), Backend sẽ đồng thời đẩy bản ghi đó sang Meilisearch.
-- Đảm bảo tính nhất quán dữ liệu mà không cần cấu hình phức tạp như CDC (Change Data Capture).
+- Course discovery và học tập: `FindAll`, `FindOne`, `FindOneForLearn`
+- Vòng đời khóa học giảng viên/admin: tạo, submit review, approve/reject/suspend, archive
+- Thanh toán và hậu thanh toán: `Checkout`, `SimulatePayment`, enrollments
+- Quiz lifecycle: `StartQuiz`, `SubmitQuiz`, tracking attempt
+- Ví và payout: `RequestPayout`, `ProcessPayout`, đối soát ledger
+- Tìm kiếm: đồng bộ index course/user sang Meilisearch
 
-### 2. Lệnh đồng bộ hóa (Manual Sync)
-Khi mới setup hoặc sau khi chạy Seed data, cần đồng bộ dữ liệu thủ công:
-```bash
-npm run sync:meili
-```
+## API chính (nhóm endpoint)
 
-### 3. Cài đặt Meilisearch
-Sử dụng Docker để chạy Meilisearch:
-```bash
-docker compose up -d meilisearch
-```
+- Auth và onboarding: `/auth/*`, webhook Clerk tại `/clerk`
+- Course domain: `/courses/*`, `/instructor/courses/*`, `/admin/courses/*`
+- User/KYC/admin user: `/users/*`
+- Enrollments và purchases: `/enrollments/*`
+- Quizzes/question bank: `/quizzes/*`, `/instructor/question-banks/*`
+- Wallet/payout/ledger: `/wallets/*`
+- Refunds: `/refunds/*`
+- Reviews, discussions, notifications, search, categories, carts, wishlist
 
-## 🛠️ Cài đặt và Chạy Project
+## Biến môi trường
 
-### 1. Yêu cầu hệ thống
-- Node.js 20+
-- PostgreSQL (hoặc Neon DB URL)
+Tạo file `.env` trong root backend. Các key đang được sử dụng:
 
-### 2. Cấu hình môi trường
-Tạo file `.env` từ `.env.example` và điền đầy đủ các thông tin:
+- `NODE_ENV`
+- `PORT`
+- `FRONTEND_URL`
+- `DATABASE_URL`
+- `REDIS_URL` hoặc `REDIS_HOST`, `REDIS_PORT`, `REDIS_TTL`
+- `CLERK_SECRET_KEY`
+- `CLERK_PUBLISHABLE_KEY`
+- `CLERK_JWT_KEY`
+- `CLERK_WEBHOOK_SECRET`
+- `CLOUDINARY_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `MEILISEARCH_HOST`
+- `MEILISEARCH_API_KEY`
+- `YOUTUBE_CLIENT_ID`
+- `YOUTUBE_CLIENT_SECRET`
+- `YOUTUBE_REFRESH_TOKEN`
 
-```bash
-cp .env.example .env
-```
+## Cài đặt và chạy
 
-Cần chú ý các khóa quan trọng từ Clerk, Cloudinary và Neon DB.
-
-### 3. Cài đặt dependency
 ```bash
 npm install
+npm run start:dev
 ```
 
-### 4. Chạy ứng dụng
-```bash
-# Development mode
-npm run start:dev
+Mặc định backend chạy ở `http://localhost:3001/api/v1`.
 
-# Production mode
+Swagger:
+
+- `http://localhost:3001/docs`
+
+Build production:
+
+```bash
 npm run build
 npm run start:prod
 ```
 
-### 5. Database Seed (Dữ liệu mẫu)
+## Scripts
+
+- `npm run start`
+- `npm run start:dev`
+- `npm run start:debug`
+- `npm run build`
+- `npm run lint`
+- `npm run test`
+- `npm run test:watch`
+- `npm run test:cov`
+- `npm run test:e2e`
+- `npm run seed`
+- `npm run sync:meili`
+
+## Seed và search sync
+
 ```bash
 npm run seed
+npm run sync:meili
 ```
 
-## 🔐 Workflow Quan trọng
+## Ghi chú vận hành
 
-1. **KYC Giảng viên**: Giảng viên nộp hồ sơ (`InstructorDocument`) -> Staff duyệt -> Tài khoản được kích hoạt quyền tạo khóa học.
-2. **Phê duyệt Khóa học**: Course được tạo -> Gửi yêu cầu phê duyệt -> Staff kiểm tra nội dung -> Public khóa học.
-3. **Đồng bộ User**: Khi người dùng đăng ký trên UI (Clerk) -> Clerk gửi webhook -> Backend nhận và tạo bản ghi tương ứng trong bảng `users` tại database local.
-
----
-
-## 📄 License
-Project này được phát triển nội bộ cho StudyMate. Mọi hình thức sao chép cần được sự đồng ý của tác giả.
+- `TypeORM synchronize` chỉ bật khi kết nối DB local (`localhost`/`127.0.0.1`).
+- `CourseStatsSubscriber` được gắn vào TypeORM subscribers để cập nhật dữ liệu denormalized liên quan course.
+- Endpoint analytics bổ sung có service Python tại `python-analytics/main.py`.
