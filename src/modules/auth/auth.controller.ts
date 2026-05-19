@@ -19,6 +19,18 @@ export class AuthController {
     };
   }
 
+  // GET /api/v1/auth/access-status
+  // Trả trạng thái truy cập tối thiểu (kể cả tài khoản đã bị ban/suspend)
+  @Get('access-status')
+  @UseGuards(ClerkAuthGuard)
+  async getAccessStatus(@ClerkUserId() clerkUserId: string) {
+    const status = await this.authService.getAccessStatus(clerkUserId);
+    return {
+      data: status,
+      message: 'Lấy trạng thái truy cập thành công',
+    };
+  }
+
   // POST /api/v1/auth/onboard
   // Được trigger sau khi User đăng ký qua luồng riêng, để gắn chặt role
   @Post('onboard')

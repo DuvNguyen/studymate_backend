@@ -42,7 +42,31 @@ export class AuthService {
   async getUserByClerkId(clerkUserId: string): Promise<User> {
     const cacheKey = `user_auth_${clerkUserId}`;
     const cached = await this.cacheManager.get<User>(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      const latestStatus = await this.userRepo.findOne({
+        where: { clerkUserId },
+        select: ['id', 'status'],
+      });
+
+      if (!latestStatus) {
+        await this.cacheManager.del(cacheKey);
+        throw new UnauthorizedException(
+          'Tài khoản không tồn tại trong hệ thống. Hãy thử đăng ký lại.',
+        );
+      }
+
+      if (latestStatus.status === UserStatus.BANNED) {
+        await this.cacheManager.del(cacheKey);
+        throw new UnauthorizedException('Tài khoản đã bị khóa vĩnh viễn.');
+      }
+
+      if (latestStatus.status === UserStatus.SUSPENDED) {
+        await this.cacheManager.del(cacheKey);
+        throw new UnauthorizedException('Tài khoản đang bị tạm đình chỉ.');
+      }
+
+      return cached;
+    }
 
     const user = await this.userRepo.findOne({
       where: { clerkUserId },
@@ -139,6 +163,29 @@ export class AuthService {
       bankAccountNumber: user.instructorProfile?.bankAccountNumber || null,
       bankAccountName: user.instructorProfile?.bankAccountName || null,
       createdAt: user.createdAt,
+    };
+  }
+
+  async getAccessStatus(clerkUserId: string) {
+    const user = await this.userRepo.findOne({
+      where: { clerkUserId },
+      relations: ['role'],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Tài khoản không tồn tại trong hệ thống. Hãy thử đăng ký lại.',
+      );
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role?.roleName ?? null,
+      status: user.status,
+      banReason: user.banReason ?? null,
+      bannedAt: user.bannedAt ?? null,
+      unbannedAt: user.unbannedAt ?? null,
     };
   }
 

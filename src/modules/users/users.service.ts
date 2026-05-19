@@ -143,13 +143,21 @@ export class UsersService {
   async findOneByClerkId(clerkUserId: string): Promise<User | null> {
     const cacheKey = `user_clerk_${clerkUserId}`;
     const cachedUser = await this.cacheManager.get<User>(cacheKey);
-    if (cachedUser) return cachedUser;
+    if (cachedUser) {
+      if (cachedUser.status !== UserStatus.ACTIVE) {
+        await this.cacheManager.del(cacheKey);
+        await this.cacheManager.del(`user_auth_${clerkUserId}`);
+        return null;
+      }
+      return cachedUser;
+    }
 
     const user = await this.userRepo.findOne({
       where: { clerkUserId },
       relations: ['role'],
     });
 
+    if (user?.status !== UserStatus.ACTIVE) return null;
     if (user) {
       await this.cacheManager.set(cacheKey, user, 300 * 1000); // 5 minutes
     }
@@ -653,6 +661,8 @@ export class UsersService {
     }
 
     await this.userRepo.save(target);
+    await this.cacheManager.del(`user_clerk_${target.clerkUserId}`);
+    await this.cacheManager.del(`user_auth_${target.clerkUserId}`);
     return this.toPublicProfile(target);
   }
 
@@ -674,6 +684,8 @@ export class UsersService {
     }
 
     await this.userRepo.save(user);
+    await this.cacheManager.del(`user_clerk_${user.clerkUserId}`);
+    await this.cacheManager.del(`user_auth_${user.clerkUserId}`);
     return this.toPublicProfile(user);
   }
 

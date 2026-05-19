@@ -750,7 +750,11 @@ export class CoursesService {
     const course = await this.coursesRepository.findOne({ where: { id } });
     if (!course) throw new NotFoundException('Không tìm thấy khóa học');
 
-    course.status = CourseStatus.REJECTED; // Or a SUSPENDED status if it existed
+    if (course.status !== CourseStatus.PUBLISHED) {
+      throw new Error('Chỉ có thể đình chỉ khóa học đang hoạt động');
+    }
+
+    course.status = CourseStatus.SUSPENDED;
     course.rejectionReason = dto.reason;
 
     const saved = await this.coursesRepository.save(course);
