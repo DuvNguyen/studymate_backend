@@ -18,8 +18,8 @@ export class HealthController {
   /**
    * GET /api/v1/health
    * Public — Kiểm tra sức khỏe của hệ thống và kết nối database.
-   * Sử dụng @Res() để bypass qua TransformInterceptor và HttpExceptionFilter toàn cục,
-   * trả về JSON trực tiếp và đầy đủ chi tiết kể cả khi gặp lỗi.
+   * Sử dụng @Res({ passthrough: true }) để trả về kết quả qua interceptor bình thường,
+   * tránh bị treo kết nối mà vẫn cấu hình được HTTP Status Code động (200 hoặc 503).
    */
   @Get()
   @Header('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -30,7 +30,9 @@ export class HealthController {
   })
   @ApiResponse({ status: 200, description: 'Hệ thống hoạt động bình thường' })
   @ApiResponse({ status: 503, description: 'Hệ thống hoặc database gặp sự cố' })
-  async checkHealth(@Res() res: Express.Response): Promise<void> {
+  async checkHealth(
+    @Res({ passthrough: true }) res: Express.Response,
+  ): Promise<any> {
     const status: {
       status: 'UP' | 'DOWN';
       timestamp: string;
@@ -101,11 +103,13 @@ export class HealthController {
       status.internet = 'SKIPPED';
     }
 
-    // Trả về mã HTTP tương ứng
+    // Thiết lập HTTP status code tương ứng mà không ngắt luồng response của NestJS
     if (status.status === 'DOWN') {
-      res.status(HttpStatus.SERVICE_UNAVAILABLE).json(status);
+      res.status(HttpStatus.SERVICE_UNAVAILABLE);
     } else {
-      res.status(HttpStatus.OK).json(status);
+      res.status(HttpStatus.OK);
     }
+
+    return status;
   }
 }
