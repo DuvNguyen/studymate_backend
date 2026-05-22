@@ -2,9 +2,10 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, FindOptionsWhere } from 'typeorm';
+import { Repository, In, FindOptionsWhere, IsNull, Not } from 'typeorm';
 import { Quiz } from '../../database/entities/quiz.entity';
 import { QuizAttempt } from '../../database/entities/quiz-attempt.entity';
 import {
@@ -75,6 +76,92 @@ export class QuizzesService {
     return payload as SubmitAnswersMap;
   }
 
+  private async getActiveEnrollmentOrThrow(courseId: number, userId: number) {
+    const enrollment = await this.enrollmentRepository.findOne({
+      where: { course_id: courseId, student_id: userId, is_active: true },
+    });
+
+    if (!enrollment) {
+      throw new ForbiddenException('Bạn chưa đăng ký khóa học này');
+    }
+
+    return enrollment;
+  }
+
+  private async assertFinalQuizEligibility(quiz: Quiz, userId: number) {
+    const enrollment = await this.getActiveEnrollmentOrThrow(
+      quiz.courseId,
+      userId,
+    );
+
+    if (enrollment.progress_percent < 80) {
+      throw new BadRequestException(
+        'BẠN CẦN HOÀN THÀNH ÍT NHẤT 80% KHÓA HỌC TRƯỚC KHI LÀM BÀI KIỂM TRA CUỐI KHÓA',
+      );
+    }
+
+    const chapterQuizzes = await this.quizRepository.find({
+      where: {
+        courseId: quiz.courseId,
+        isFinal: false,
+        isActive: true,
+        sectionId: Not(IsNull()),
+      },
+      select: ['id'],
+    });
+
+    if (chapterQuizzes.length === 0) return;
+
+    const passedAttempts = await this.attemptRepository.find({
+      where: {
+        quizId: In(chapterQuizzes.map((chapterQuiz) => chapterQuiz.id)),
+        userId,
+        isPassed: true,
+        completedAt: Not(IsNull()),
+      },
+      select: ['quizId'],
+    });
+
+    const passedQuizIds = new Set(
+      passedAttempts.map((attempt) => Number(attempt.quizId)),
+    );
+    const hasUnpassedChapterQuiz = chapterQuizzes.some(
+      (chapterQuiz) => !passedQuizIds.has(Number(chapterQuiz.id)),
+    );
+
+    if (hasUnpassedChapterQuiz) {
+      throw new BadRequestException(
+        'BẠN CẦN HOÀN THÀNH TẤT CẢ BÀI KIỂM TRA CHƯƠNG TRƯỚC KHI LÀM BÀI KIỂM TRA CUỐI KHÓA',
+      );
+    }
+  }
+
+  private async countCompletedAttempts(quizId: number, userId: number) {
+    return this.attemptRepository.count({
+      where: { quizId, userId, completedAt: Not(IsNull()) },
+    });
+  }
+
+  private isAttemptExpired(
+    attempt: QuizAttempt,
+    quiz: Quiz,
+    now = new Date(),
+  ) {
+    if (!quiz.timeLimit || quiz.timeLimit <= 0) return false;
+    const expiresAt = new Date(
+      attempt.startedAt.getTime() + quiz.timeLimit * 60 * 1000,
+    );
+    return now > expiresAt;
+  }
+
+  private async getUnsubmittedAttempt(quizId: number, userId: number) {
+    return this.attemptRepository.findOne({
+      where: { quizId, userId, completedAt: IsNull() },
+      order: { startedAt: 'DESC' },
+      relations: ['quiz'],
+    });
+  }
+
   async getQuizzesByCourse(courseId: number) {
     return this.quizRepository.find({
       where: { courseId, isActive: true },
@@ -106,13 +193,26 @@ export class QuizzesService {
     const quiz = await this.getQuiz(quizId);
     console.log(`[QuizzesService] Quiz found: ${quiz?.title}`);
 
-    // Check attempt limits
-    const attempts = await this.getUserAttempts(quizId, userId);
-    console.log(`[QuizzesService] Past attempts count: ${attempts.length}`);
-    if (quiz.isFinal && attempts.length >= 2) {
-      throw new BadRequestException(
-        'BẠN ĐÃ HẾT LƯỢT LÀM BÀI KIỂM TRA CUỐI KHÓA (TỐI ĐA 2 LẦN)',
+    if (quiz.isFinal) {
+      await this.assertFinalQuizEligibility(quiz, userId);
+
+      const activeAttempt = await this.getUnsubmittedAttempt(quizId, userId);
+      if (activeAttempt && !this.isAttemptExpired(activeAttempt, quiz)) {
+        return activeAttempt;
+      }
+
+      const completedAttempts = await this.countCompletedAttempts(
+        quizId,
+        userId,
       );
+      console.log(
+        `[QuizzesService] Completed final attempts count: ${completedAttempts}`,
+      );
+      if (completedAttempts >= 2) {
+        throw new BadRequestException(
+          'BẠN ĐÃ HẾT LƯỢT LÀM BÀI KIỂM TRA CUỐI KHÓA (TỐI ĐA 2 LẦN)',
+        );
+      }
     }
 
     // Pick random questions from bank
@@ -257,6 +357,12 @@ export class QuizzesService {
       throw new BadRequestException('BÀI KIỂM TRA ĐÃ ĐƯỢC NỘP TRƯỚC ĐÓ');
 
     const quiz = attempt.quiz;
+    const submittedAt = new Date();
+    if (this.isAttemptExpired(attempt, quiz, submittedAt)) {
+      console.log(
+        `[QuizzesService] Attempt ${attempt.id} submitted after time limit`,
+      );
+    }
     const snapshots = this.parseSnapshots(attempt.questionSnapshots);
 
     // Fetch correct options from DB to grade
@@ -312,7 +418,7 @@ export class QuizzesService {
     attempt.score = scorePercent;
     attempt.isPassed = isPassed;
     attempt.answers = answers;
-    attempt.completedAt = new Date();
+    attempt.completedAt = submittedAt;
 
     const saved = await this.attemptRepository.save(attempt);
 
