@@ -98,6 +98,14 @@ export class AuthService {
   async getMe(clerkUserId: string) {
     const user = await this.getUserByClerkId(clerkUserId);
 
+    // FIX: Luôn fetch instructorProfile trực tiếp từ DB để tránh stale cache.
+    // user.instructorProfile có thể là dữ liệu cũ (kycStatus lỗi thời) nếu cache
+    // được set trước khi admin approve KYC. TTL cache = 5 phút → gây ra hiện tượng
+    // KYC page hiện form trống rồi sau 5 phút tự nhiên đúng lại.
+    const freshInstructorProfile = await this.instructorProfileRepo.findOne({
+      where: { userId: user.id },
+    });
+
     // Sync with Clerk to get latest info (Name, Avatar)
     const clerk = createClerkClient({
       secretKey: process.env.CLERK_SECRET_KEY,
@@ -158,10 +166,11 @@ export class AuthService {
       lastName:
         lastName || user.profile?.fullName?.split(' ').slice(1).join(' ') || '',
       fullName: fullName,
-      kycStatus: user.instructorProfile?.kycStatus || null,
-      bankName: user.instructorProfile?.bankName || null,
-      bankAccountNumber: user.instructorProfile?.bankAccountNumber || null,
-      bankAccountName: user.instructorProfile?.bankAccountName || null,
+      // Dùng freshInstructorProfile (từ DB) thay vì từ cached user object
+      kycStatus: freshInstructorProfile?.kycStatus || null,
+      bankName: freshInstructorProfile?.bankName || null,
+      bankAccountNumber: freshInstructorProfile?.bankAccountNumber || null,
+      bankAccountName: freshInstructorProfile?.bankAccountName || null,
       createdAt: user.createdAt,
     };
   }
