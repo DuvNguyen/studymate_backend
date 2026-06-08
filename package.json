@@ -50,7 +50,13 @@
     "rxjs": "^7.8.1",
     "svix": "^1.88.0",
     "swagger-ui-express": "^5.0.1",
-    "typeorm": "^0.3.28"
+    "typeorm": "^0.3.28",
+    "@nestjs/platform-socket.io": "^11.0.1",
+    "@nestjs/websockets": "^11.0.1",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "redis": "^4.7.0",
+    "socket.io": "^4.8.1",
+    "@nestjs/event-emitter": "^3.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

@@ -11,7 +11,11 @@ import { Lesson } from '../../database/entities/lesson.entity';
 import { User } from '../../database/entities/user.entity';
 import { UpsertProgressDto } from './dto/upsert-progress-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 import { Course } from '../../database/entities/course.entity';
 
 @Injectable()
@@ -133,13 +137,16 @@ export class LessonProgressService {
           where: { id: courseId },
         });
         if (course) {
-          await this.notificationsService.sendNotification(
-            enrollment.student_id,
-            NotificationType.ENROLLMENT,
-            'Hoàn thành 100% khóa học!',
-            `Tuyệt vời! Bạn đã hoàn thành 100% khóa học "${course.title}".`,
-            { courseId, enrollmentId },
-          );
+          await this.notificationsService.sendNotification({
+            userId: enrollment.student_id,
+            type: NotificationType.ENROLLMENT,
+            category: NotificationCategory.LEARNING,
+            eventType: NotificationEventType.COURSE_COMPLETED,
+            title: 'Hoàn thành 100% khóa học!',
+            message: `Tuyệt vời! Bạn đã hoàn thành 100% khóa học "${course.title}".`,
+            linkUrl: `/courses/${course.slug}/learn`,
+            metadata: { courseId, enrollmentId, slug: course.slug },
+          });
         }
       } catch (e) {
         console.error('Failed to send completion notification:', e);

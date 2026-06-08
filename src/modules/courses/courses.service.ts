@@ -14,7 +14,11 @@ import { Enrollment } from '../../database/entities/enrollment.entity';
 import { User } from '../../database/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SearchService } from '../search/search.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 import { CourseQueryDto } from './dto/course-query.dto';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -519,13 +523,16 @@ export class CoursesService {
 
     if (studentIds.length > 0) {
       for (const studentId of studentIds) {
-        await this.notificationsService.sendNotification(
-          studentId,
-          NotificationType.COURSE,
-          'Khóa học đã được lưu trữ',
-          `Khóa học "${course.title}" đã được giảng viên lưu trữ. Bạn hiện không thể vào học nội dung này cho đến khi giảng viên mở lại.`,
-          { courseId: course.id, slug: course.slug },
-        );
+        await this.notificationsService.sendNotification({
+          userId: studentId,
+          type: NotificationType.COURSE,
+          category: NotificationCategory.SYSTEM,
+          eventType: NotificationEventType.COURSE_ARCHIVED,
+          title: 'Khóa học đã được lưu trữ',
+          message: `Khóa học "${course.title}" đã được giảng viên lưu trữ. Bạn hiện không thể vào học nội dung này cho đến khi giảng viên mở lại.`,
+          linkUrl: `/courses/${course.slug}`,
+          metadata: { courseId: course.id, slug: course.slug },
+        });
       }
     }
   }
@@ -626,6 +633,7 @@ export class CoursesService {
     course.status = CourseStatus.PENDING_REVIEW;
     course.rejectionReason = null; // Clear old reason
     const saved = await this.coursesRepository.save(course);
+
     return this.toDto(saved);
   }
 
@@ -740,6 +748,22 @@ export class CoursesService {
     course.rejectionReason = dto.reason;
 
     const saved = await this.coursesRepository.save(course);
+
+    await this.notificationsService.sendNotification({
+      userId: course.instructorId,
+      type: NotificationType.COURSE,
+      category: NotificationCategory.SYSTEM,
+      eventType: NotificationEventType.COURSE_REJECTED,
+      title: 'Khóa học bị từ chối',
+      message: `Khóa học "${course.title}" bị từ chối. Lý do: ${dto.reason}`,
+      linkUrl: `/dashboard/instructor/courses/${course.id}/builder?notice=rejected`,
+      metadata: {
+        courseId: course.id,
+        slug: course.slug,
+        rejectionReason: dto.reason,
+      },
+    });
+
     return this.toDto(saved);
   }
 
@@ -758,6 +782,22 @@ export class CoursesService {
     course.rejectionReason = dto.reason;
 
     const saved = await this.coursesRepository.save(course);
+
+    await this.notificationsService.sendNotification({
+      userId: course.instructorId,
+      type: NotificationType.COURSE,
+      category: NotificationCategory.SYSTEM,
+      eventType: NotificationEventType.COURSE_ARCHIVED,
+      title: 'Khóa học bị đình chỉ',
+      message: `Khóa học "${course.title}" bị đình chỉ. Lý do: ${dto.reason}`,
+      linkUrl: `/dashboard/instructor/courses/${course.id}/builder?notice=rejected`,
+      metadata: {
+        courseId: course.id,
+        slug: course.slug,
+        rejectionReason: dto.reason,
+      },
+    });
+
     return this.toDto(saved);
   }
 

@@ -5,6 +5,7 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -83,6 +84,7 @@ import { CourseStatsSubscriber } from './database/subscribers/course-stats.subsc
 
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
 
     AuthModule,
     UsersModule,

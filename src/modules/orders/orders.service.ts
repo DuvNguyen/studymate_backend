@@ -16,7 +16,11 @@ import { Transaction } from '../../database/entities/transaction.entity';
 
 import { CouponsService } from '../coupons/coupons.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 
 @Injectable()
 export class OrdersService {
@@ -289,26 +293,32 @@ export class OrdersService {
         }).format(Number(item.instructor_amount));
 
         // Student notification
-        await this.notificationsService.sendNotification(
-          order.student_id,
-          NotificationType.ENROLLMENT,
-          'Đăng ký thành công!',
-          `Thanh toán thành công! Khóa học "${courseTitle}" đã được thêm vào thư viện của bạn. Bắt đầu học ngay!`,
-          { courseId: item.course_id, orderId: order.id },
-        );
+        await this.notificationsService.sendNotification({
+          userId: order.student_id,
+          type: NotificationType.ENROLLMENT,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.ORDER_SUCCESS,
+          title: 'Đăng ký thành công!',
+          message: `Thanh toán thành công! Khóa học "${courseTitle}" đã được thêm vào thư viện của bạn. Bắt đầu học ngay!`,
+          linkUrl: '/dashboard/student/purchases',
+          metadata: { courseId: item.course_id, orderId: order.id, slug: course?.slug },
+        });
 
         // Instructor notification
-        await this.notificationsService.sendNotification(
-          item.instructor_id,
-          NotificationType.WALLET,
-          'Thu nhập mới!',
-          `Bạn vừa có học viên mới! ${amountFormatted} đã được cộng vào số dư đóng băng của bạn.`,
-          {
+        await this.notificationsService.sendNotification({
+          userId: item.instructor_id,
+          type: NotificationType.WALLET,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.WALLET_INCOME,
+          title: 'Thu nhập mới!',
+          message: `Bạn vừa có học viên mới! ${amountFormatted} đã được cộng vào số dư đóng băng của bạn.`,
+          linkUrl: '/dashboard/instructor/wallet',
+          metadata: {
             courseId: item.course_id,
             orderId: order.id,
             amount: item.instructor_amount,
           },
-        );
+        });
       }
 
       return order;

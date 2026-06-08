@@ -14,7 +14,11 @@ import { RequestPayoutDto } from './dto/request-payout.dto';
 import { ProcessPayoutDto } from './dto/process-payout.dto';
 import { User } from '../../database/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 
 @Injectable()
 export class WalletsService {
@@ -237,13 +241,16 @@ export class WalletsService {
         currency: 'VND',
       }).format(dto.amount);
       for (const admin of admins) {
-        await this.notificationsService.sendNotification(
-          admin.id,
-          NotificationType.WALLET,
-          'Yêu cầu rút tiền mới',
-          `Có yêu cầu rút tiền ${amountFormatted} từ Giảng viên. Vui lòng kiểm tra đối soát.`,
-          { payoutId: payout.id, amount: dto.amount },
-        );
+        await this.notificationsService.sendNotification({
+          userId: admin.id,
+          type: NotificationType.WALLET,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.PAYOUT_REQUESTED,
+          title: 'Yêu cầu rút tiền mới',
+          message: `Có yêu cầu rút tiền ${amountFormatted} từ Giảng viên. Vui lòng kiểm tra đối soát.`,
+          linkUrl: '/dashboard/admin/wallet',
+          metadata: { payoutId: payout.id, amount: dto.amount },
+        });
       }
 
       return payout;
@@ -338,21 +345,27 @@ export class WalletsService {
       }).format(Number(payout.amount));
 
       if (dto.status === PayoutStatus.COMPLETED) {
-        await this.notificationsService.sendNotification(
-          payout.instructorId,
-          NotificationType.WALLET,
-          'Giải ngân thành công!',
-          `Yêu cầu rút tiền REQ-${payout.id} đã thành công. ${amountFormatted} đã được chuyển vào tài khoản ${payout.bankAccountNumber}.`,
-          { payoutId: payout.id },
-        );
+        await this.notificationsService.sendNotification({
+          userId: payout.instructorId,
+          type: NotificationType.WALLET,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.PAYOUT_STATUS,
+          title: 'Giải ngân thành công!',
+          message: `Yêu cầu rút tiền REQ-${payout.id} đã thành công. ${amountFormatted} đã được chuyển vào tài khoản ${payout.bankAccountNumber}.`,
+          linkUrl: '/dashboard/instructor/wallet',
+          metadata: { payoutId: payout.id, status: dto.status },
+        });
       } else if (dto.status === PayoutStatus.REJECTED) {
-        await this.notificationsService.sendNotification(
-          payout.instructorId,
-          NotificationType.WALLET,
-          'Yêu cầu rút tiền bị từ chối',
-          `Yêu cầu rút tiền bị từ chối. Lý do: ${dto.adminNote || 'Không rõ'}. Vui lòng kiểm tra lại thông tin ngân hàng.`,
-          { payoutId: payout.id },
-        );
+        await this.notificationsService.sendNotification({
+          userId: payout.instructorId,
+          type: NotificationType.WALLET,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.PAYOUT_STATUS,
+          title: 'Yêu cầu rút tiền bị từ chối',
+          message: `Yêu cầu rút tiền bị từ chối. Lý do: ${dto.adminNote || 'Không rõ'}. Vui lòng kiểm tra lại thông tin ngân hàng.`,
+          linkUrl: '/dashboard/instructor/wallet',
+          metadata: { payoutId: payout.id, status: dto.status, reason: dto.adminNote },
+        });
       }
 
       return payout;

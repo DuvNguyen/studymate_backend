@@ -9,7 +9,11 @@ import { Review } from '../../database/entities/review.entity';
 import { Course } from '../../database/entities/course.entity';
 import { User } from '../../database/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 
 @Injectable()
 export class ReviewsService {
@@ -75,13 +79,16 @@ export class ReviewsService {
 
       // Notify instructor about new review
       if (course.instructorId) {
-        await this.notificationsService.sendNotification(
-          course.instructorId,
-          NotificationType.REVIEW,
-          'Đánh giá mới!',
-          `Khóa học "${course.title}" vừa nhận được một đánh giá ${data.rating} sao mới.`,
-          { courseId: data.courseId, reviewId: review.id, rating: data.rating },
-        );
+        await this.notificationsService.sendNotification({
+          userId: course.instructorId,
+          type: NotificationType.REVIEW,
+          category: NotificationCategory.LEARNING,
+          eventType: NotificationEventType.REVIEW_CREATED,
+          title: 'Đánh giá mới!',
+          message: `Khóa học "${course.title}" vừa nhận được một đánh giá ${data.rating} sao mới.`,
+          linkUrl: `/dashboard/instructor/courses/${data.courseId}/builder`,
+          metadata: { courseId: data.courseId, reviewId: review.id, rating: data.rating },
+        });
       }
 
       return review;

@@ -15,7 +15,11 @@ import { DiscussionResponseDto } from './dto/discussion-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { RoleName } from '../../common/constants/role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 import { Course } from '../../database/entities/course.entity';
 import { Lesson } from '../../database/entities/lesson.entity';
 
@@ -119,6 +123,9 @@ export class DiscussionsService {
     try {
       const authorName =
         user.profile?.fullName || user.email?.split('@')[0] || 'Người dùng';
+      const discussionCourse = await this.coursesRepo.findOne({
+        where: { id: dto.courseId },
+      });
 
       // 1. If it's a reply, notify the parent comment author
       if (dto.parentId) {
@@ -127,17 +134,20 @@ export class DiscussionsService {
           relations: ['user'],
         });
         if (parent && parent.user_id !== user.id) {
-          await this.notificationsService.sendNotification(
-            parent.user_id,
-            NotificationType.COMMUNITY,
-            'Trả lời mới!',
-            `${authorName} đã trả lời bình luận của bạn. Xem ngay!`,
-            {
+          await this.notificationsService.sendNotification({
+            userId: parent.user_id,
+            type: NotificationType.COMMUNITY,
+            category: NotificationCategory.LEARNING,
+            eventType: NotificationEventType.LESSON_DISCUSSION_REPLY,
+            title: 'Trả lời mới!',
+            message: `${authorName} đã trả lời bình luận của bạn. Xem ngay!`,
+            linkUrl: `/courses/${discussionCourse?.slug || dto.courseId}/learn?lesson=${dto.lessonId}&discussion=${discussion.id}`,
+            metadata: {
               discussionId: discussion.id,
               lessonId: dto.lessonId,
               courseId: dto.courseId,
             },
-          );
+          });
         }
       }
       // 2. If it's a NEW question (root), notify the instructor
@@ -148,17 +158,21 @@ export class DiscussionsService {
         });
 
         if (course && course.instructorId !== user.id) {
-          await this.notificationsService.sendNotification(
-            course.instructorId,
-            NotificationType.COMMUNITY,
-            'Câu hỏi mới từ học viên!',
-            `${authorName} đã đặt một câu hỏi mới trong khóa học "${course.title}".`,
-            {
+          await this.notificationsService.sendNotification({
+            userId: course.instructorId,
+            type: NotificationType.COMMUNITY,
+            category: NotificationCategory.LEARNING,
+            eventType: NotificationEventType.LESSON_DISCUSSION_NEW,
+            title: 'Câu hỏi mới từ học viên!',
+            message: `${authorName} đã đặt một câu hỏi mới trong khóa học "${course.title}".`,
+            linkUrl: `/courses/${course.slug}/instructor-view?lesson=${dto.lessonId}&discussion=${discussion.id}`,
+            metadata: {
               discussionId: discussion.id,
               lessonId: dto.lessonId,
               courseId: dto.courseId,
+              slug: course.slug,
             },
-          );
+          });
         }
       }
     } catch (e) {

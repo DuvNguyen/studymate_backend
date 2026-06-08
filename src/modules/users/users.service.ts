@@ -38,7 +38,11 @@ import {
 import { createClerkClient } from '@clerk/backend';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SearchService } from '../search/search.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 
 export interface PaginationMeta {
   total: number;
@@ -504,24 +508,31 @@ export class UsersService {
 
     // Send KYC notification
     if (status === KycStatus.APPROVED) {
-      await this.notificationsService.sendNotification(
-        targetId,
-        NotificationType.KYC,
-        'Hồ sơ đã được xác minh!',
-        'Hồ sơ giảng viên của bạn đã được xác minh thành công. Bạn đã có thể thực hiện rút tiền.',
-        { kycStatus: 'APPROVED' },
-      );
+      await this.notificationsService.sendNotification({
+        userId: targetId,
+        type: NotificationType.KYC,
+        category: NotificationCategory.SYSTEM,
+        eventType: NotificationEventType.KYC_APPROVED,
+        title: 'Hồ sơ đã được xác minh!',
+        message:
+          'Hồ sơ giảng viên của bạn đã được xác minh thành công. Bạn đã có thể thực hiện rút tiền.',
+        linkUrl: '/dashboard/instructor/kyc',
+        metadata: { kycStatus: 'APPROVED' },
+      });
     } else if (
       status === KycStatus.REJECTED &&
       !this.isStudentRole(user.role?.roleName)
     ) {
-      await this.notificationsService.sendNotification(
-        targetId,
-        NotificationType.KYC,
-        'Hồ sơ cần chỉnh sửa',
-        `Hồ sơ giảng viên cần chỉnh sửa thêm. Lý do: ${reason || 'Không rõ'}`,
-        { kycStatus: 'REJECTED', reason },
-      );
+      await this.notificationsService.sendNotification({
+        userId: targetId,
+        type: NotificationType.KYC,
+        category: NotificationCategory.SYSTEM,
+        eventType: NotificationEventType.KYC_REJECTED,
+        title: 'Hồ sơ cần chỉnh sửa',
+        message: `Hồ sơ giảng viên cần chỉnh sửa thêm. Lý do: ${reason || 'Không rõ'}`,
+        linkUrl: '/dashboard/instructor/kyc',
+        metadata: { kycStatus: 'REJECTED', reason },
+      });
     }
 
     return this.toPublicProfile(user);

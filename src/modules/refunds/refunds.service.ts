@@ -15,7 +15,11 @@ import { Transaction } from '../../database/entities/transaction.entity';
 import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
 import { ProcessRefundDto } from './dto/process-refund.dto';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 import { User } from '../../database/entities/user.entity';
 
 @Injectable()
@@ -90,13 +94,16 @@ export class RefundsService {
     await this.refundRequestsRepo.save(refundRequest);
 
     // 1. Notify Student
-    await this.notificationsService.sendNotification(
+    await this.notificationsService.sendNotification({
       userId,
-      NotificationType.ENROLLMENT,
-      'Yêu cầu hoàn tiền đã được gửi',
-      `Yêu cầu hoàn tiền cho khóa học "${enrollment.course.title}" của bạn đã được gửi thành công và đang chờ xử lý.`,
-      { refundId: refundRequest.id },
-    );
+      type: NotificationType.ENROLLMENT,
+      category: NotificationCategory.TRANSACTIONS,
+      eventType: NotificationEventType.REFUND_REQUESTED,
+      title: 'Yêu cầu hoàn tiền đã được gửi',
+      message: `Yêu cầu hoàn tiền cho khóa học "${enrollment.course.title}" của bạn đã được gửi thành công và đang chờ xử lý.`,
+      linkUrl: `/dashboard/student/purchases?tab=refunds&refundId=${refundRequest.id}`,
+      metadata: { refundId: refundRequest.id, courseId: enrollment.course_id },
+    });
 
     // 2. Notify Admins and Staff
     const staff = await this.dataSource.manager.find(User, {
@@ -105,13 +112,16 @@ export class RefundsService {
     });
 
     for (const member of staff) {
-      await this.notificationsService.sendNotification(
-        member.id,
-        NotificationType.SYSTEM,
-        'Yêu cầu hoàn tiền mới',
-        `Học viên vừa yêu cầu hoàn tiền cho khóa học "${enrollment.course.title}".`,
-        { refundId: refundRequest.id },
-      );
+      await this.notificationsService.sendNotification({
+        userId: member.id,
+        type: NotificationType.SYSTEM,
+        category: NotificationCategory.SYSTEM,
+        eventType: NotificationEventType.REFUND_REQUESTED,
+        title: 'Yêu cầu hoàn tiền mới',
+        message: `Học viên vừa yêu cầu hoàn tiền cho khóa học "${enrollment.course.title}".`,
+        linkUrl: '/dashboard/admin/refunds',
+        metadata: { refundId: refundRequest.id, courseId: enrollment.course_id },
+      });
     }
 
     return refundRequest;
@@ -232,30 +242,39 @@ export class RefundsService {
 
       // Notifications
       if (dto.status === RefundStatus.APPROVED) {
-        await this.notificationsService.sendNotification(
-          refundRequest.student_id,
-          NotificationType.ORDER,
-          'Hoàn tiền thành công',
-          `Yêu cầu hoàn tiền khóa học "${refundRequest.course.title}" đã được chấp nhận. Tiền sẽ được chuyển về tài khoản của bạn sớm.`,
-          { refundId: refundRequest.id },
-        );
+        await this.notificationsService.sendNotification({
+          userId: refundRequest.student_id,
+          type: NotificationType.ORDER,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.REFUND_APPROVED,
+          title: 'Hoàn tiền thành công',
+          message: `Yêu cầu hoàn tiền khóa học "${refundRequest.course.title}" đã được chấp nhận. Tiền sẽ được chuyển về tài khoản của bạn sớm.`,
+          linkUrl: `/dashboard/student/purchases?tab=refunds&refundId=${refundRequest.id}`,
+          metadata: { refundId: refundRequest.id },
+        });
 
         // Notify instructor about the deduction
-        await this.notificationsService.sendNotification(
-          refundRequest.enrollment.order_item.instructor_id,
-          NotificationType.WALLET,
-          'Khấu trừ hoàn tiền',
-          `Yêu cầu hoàn tiền của học viên cho khóa học "${refundRequest.course.title}" đã được duyệt. Số dư treo của bạn đã bị khấu trừ.`,
-          { refundId: refundRequest.id },
-        );
+        await this.notificationsService.sendNotification({
+          userId: refundRequest.enrollment.order_item.instructor_id,
+          type: NotificationType.WALLET,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.REFUND_APPROVED,
+          title: 'Khấu trừ hoàn tiền',
+          message: `Yêu cầu hoàn tiền của học viên cho khóa học "${refundRequest.course.title}" đã được duyệt. Số dư treo của bạn đã bị khấu trừ.`,
+          linkUrl: '/dashboard/instructor/wallet',
+          metadata: { refundId: refundRequest.id },
+        });
       } else {
-        await this.notificationsService.sendNotification(
-          refundRequest.student_id,
-          NotificationType.ORDER,
-          'Yêu cầu hoàn tiền bị từ chối',
-          `Yêu cầu hoàn tiền khóa học "${refundRequest.course.title}" bị từ chối. Lý do: ${dto.adminNote}`,
-          { refundId: refundRequest.id },
-        );
+        await this.notificationsService.sendNotification({
+          userId: refundRequest.student_id,
+          type: NotificationType.ORDER,
+          category: NotificationCategory.TRANSACTIONS,
+          eventType: NotificationEventType.REFUND_REJECTED,
+          title: 'Yêu cầu hoàn tiền bị từ chối',
+          message: `Yêu cầu hoàn tiền khóa học "${refundRequest.course.title}" bị từ chối. Lý do: ${dto.adminNote}`,
+          linkUrl: `/dashboard/student/purchases?tab=refunds&refundId=${refundRequest.id}`,
+          metadata: { refundId: refundRequest.id, reason: dto.adminNote },
+        });
       }
 
       return refundRequest;

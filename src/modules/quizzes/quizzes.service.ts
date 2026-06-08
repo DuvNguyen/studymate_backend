@@ -16,7 +16,11 @@ import {
 import { QuestionBank } from '../../database/entities/question-bank.entity';
 import { Enrollment } from '../../database/entities/enrollment.entity';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../../database/entities/notification.entity';
+import {
+  NotificationCategory,
+  NotificationEventType,
+  NotificationType,
+} from '../../database/entities/notification.entity';
 
 interface QuizSnapshotOption {
   id: number;
@@ -349,7 +353,7 @@ export class QuizzesService {
   ) {
     const attempt = await this.attemptRepository.findOne({
       where: { id: attemptId, userId },
-      relations: ['quiz'],
+      relations: ['quiz', 'quiz.course'],
     });
 
     if (!attempt) throw new NotFoundException('Không tìm thấy lượt làm bài');
@@ -428,8 +432,7 @@ export class QuizzesService {
       await this.markCourseCompleted(quiz.courseId, userId);
     }
 
-    // Send quiz notifications in the background
-    void this.sendQuizNotifications(
+    await this.sendQuizNotifications(
       quiz,
       userId,
       scorePercent,
@@ -496,34 +499,43 @@ export class QuizzesService {
       const quizTitle = quiz.title || 'Bài kiểm tra';
 
       if (isPassed) {
-        await this.notificationsService.sendNotification(
+        await this.notificationsService.sendNotification({
           userId,
-          NotificationType.QUIZ,
-          'Chúc mừng! Vượt qua bài kiểm tra!',
-          `Bạn đã đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%) trong bài kiểm tra "${quizTitle}".${quiz.isFinal ? ' Bạn đã đủ điều kiện hoàn thành khóa học!' : ''}`,
-          { quizId: quiz.id, score: scorePercent },
-        );
+          type: NotificationType.QUIZ,
+          category: NotificationCategory.LEARNING,
+          eventType: NotificationEventType.QUIZ_RESULT,
+          title: 'Chúc mừng! Vượt qua bài kiểm tra!',
+          message: `Bạn đã đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%) trong bài kiểm tra "${quizTitle}".${quiz.isFinal ? ' Bạn đã đủ điều kiện hoàn thành khóa học!' : ''}`,
+          linkUrl: quiz.course?.slug ? `/courses/${quiz.course.slug}/learn` : null,
+          metadata: { quizId: quiz.id, score: scorePercent, courseId: quiz.courseId },
+        });
       } else {
-        await this.notificationsService.sendNotification(
+        await this.notificationsService.sendNotification({
           userId,
-          NotificationType.QUIZ,
-          'Kết quả bài kiểm tra',
-          `Rất tiếc, bạn chỉ đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%). Hãy ôn tập lại và thử lại nhé!`,
-          { quizId: quiz.id, score: scorePercent },
-        );
+          type: NotificationType.QUIZ,
+          category: NotificationCategory.LEARNING,
+          eventType: NotificationEventType.QUIZ_RESULT,
+          title: 'Kết quả bài kiểm tra',
+          message: `Rất tiếc, bạn chỉ đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%). Hãy ôn tập lại và thử lại nhé!`,
+          linkUrl: quiz.course?.slug ? `/courses/${quiz.course.slug}/learn` : null,
+          metadata: { quizId: quiz.id, score: scorePercent, courseId: quiz.courseId },
+        });
       }
 
       // If final exam passed, send course completion notification
       if (quiz.isFinal && isPassed) {
         const course = quiz.course;
         if (course) {
-          await this.notificationsService.sendNotification(
+          await this.notificationsService.sendNotification({
             userId,
-            NotificationType.ENROLLMENT,
-            'Hoàn thành khóa học!',
-            `Tuyệt vời! Bạn đã hoàn thành khóa học "${course.title}". Chứng chỉ của bạn đã sẵn sàng!`,
-            { courseId: quiz.courseId },
-          );
+            type: NotificationType.ENROLLMENT,
+            category: NotificationCategory.LEARNING,
+            eventType: NotificationEventType.COURSE_COMPLETED,
+            title: 'Hoàn thành khóa học!',
+            message: `Tuyệt vời! Bạn đã hoàn thành khóa học "${course.title}". Chứng chỉ của bạn đã sẵn sàng!`,
+            linkUrl: `/courses/${course.slug}/learn`,
+            metadata: { courseId: quiz.courseId, slug: course.slug },
+          });
         }
       }
     } catch (e) {

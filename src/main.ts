@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 
 async function bootstrap() {
   console.log('Đang khởi động lại Backend để nạp cấu hình mới...');
@@ -12,6 +13,10 @@ async function bootstrap() {
   });
 
   const config = app.get(ConfigService);
+
+  const redisIoAdapter = new RedisIoAdapter(app, config);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // Bảo mật HTTP headers
   app.use(helmet());
