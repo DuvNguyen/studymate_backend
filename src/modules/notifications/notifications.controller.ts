@@ -7,6 +7,10 @@ import { User } from '../../database/entities/user.entity';
 import { ListNotificationsDto } from './dto/list-notifications.dto';
 import { NotificationCategory } from '../../database/entities/notification.entity';
 
+/**
+ * Notifications là dữ liệu cá nhân real-time.
+ * Cache được bypass tự động bởi UserAwareCacheInterceptor (global).
+ */
 @Controller('notifications')
 @UseGuards(ClerkAuthGuard, RolesGuard)
 export class NotificationsController {
@@ -46,3 +50,4 @@ export class NotificationsController {
     return this.notificationsService.deleteOldRead(user.id, before);
   }
 }
+

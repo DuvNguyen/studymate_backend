@@ -12,6 +12,7 @@ import { Transaction } from '../../database/entities/transaction.entity';
 import { User } from '../../database/entities/user.entity';
 
 import { CouponsModule } from '../coupons/coupons.module';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
@@ -25,8 +26,10 @@ import { CouponsModule } from '../coupons/coupons.module';
       User,
     ]),
     CouponsModule,
+    PaymentsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
+  exports: [OrdersService],
 })
 export class OrdersModule {}

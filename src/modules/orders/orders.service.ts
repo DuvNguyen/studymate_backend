@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import type { WebhookData } from '@payos/node';
 import { User } from '../../database/entities/user.entity';
 import { Cart } from '../../database/entities/cart.entity';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
@@ -16,6 +17,7 @@ import { Transaction } from '../../database/entities/transaction.entity';
 
 import { CouponsService } from '../coupons/coupons.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PayosService } from '../payments/payos.service';
 import {
   NotificationCategory,
   NotificationEventType,
@@ -30,6 +32,7 @@ export class OrdersService {
     private dataSource: DataSource,
     private couponsService: CouponsService,
     private notificationsService: NotificationsService,
+    private payosService: PayosService,
   ) {}
 
   async checkoutParams(user: User, couponCode?: string) {
@@ -120,13 +123,24 @@ export class OrdersService {
 
       // Xóa item trong cart
       order.total_amount = totalAmount - totalDiscount;
+
+      const paymentLink =
+        await this.payosService.createCoursePaymentLink(order);
+      order.payment_method = 'PAYOS';
+      order.payment_gateway_id = paymentLink.paymentLinkId;
+
       await queryRunner.manager.save(order);
 
       // Xóa item trong cart
       await queryRunner.manager.remove(cart.cart_items);
 
       await queryRunner.commitTransaction();
-      return order;
+      return {
+        ...order,
+        checkoutUrl: paymentLink.checkoutUrl,
+        qrCode: paymentLink.qrCode,
+        paymentLinkId: paymentLink.paymentLinkId,
+      };
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -135,7 +149,12 @@ export class OrdersService {
     }
   }
 
-  async testFulfillOrder(orderId: number) {
+  async testFulfillOrder(
+    orderId: number,
+    paymentMethod = 'MANUAL_SIMULATION',
+    paymentGatewayId?: string,
+    allowCompleted = false,
+  ) {
     // This is a temporary method to simulate webhook payment fulfill
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -151,11 +170,19 @@ export class OrdersService {
       });
 
       if (!order) throw new NotFoundException('Order not found');
+      if (order.status === OrderStatus.COMPLETED && allowCompleted) {
+        await queryRunner.rollbackTransaction();
+        return order;
+      }
       if (order.status === OrderStatus.COMPLETED)
         throw new BadRequestException('Order already completed');
 
       order.status = OrderStatus.COMPLETED;
       order.completed_at = new Date();
+      order.payment_method = paymentMethod;
+      if (paymentGatewayId) {
+        order.payment_gateway_id = paymentGatewayId;
+      }
       await queryRunner.manager.save(order);
 
       // Distribute money and enroll student
@@ -301,7 +328,11 @@ export class OrdersService {
           title: 'Đăng ký thành công!',
           message: `Thanh toán thành công! Khóa học "${courseTitle}" đã được thêm vào thư viện của bạn. Bắt đầu học ngay!`,
           linkUrl: '/dashboard/student/purchases',
-          metadata: { courseId: item.course_id, orderId: order.id, slug: course?.slug },
+          metadata: {
+            courseId: item.course_id,
+            orderId: order.id,
+            slug: course?.slug,
+          },
         });
 
         // Instructor notification
@@ -328,6 +359,51 @@ export class OrdersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async processPayosWebhook(webhookData: WebhookData) {
+    const order = await this.ordersRepo.findOne({
+      where: { id: webhookData.orderCode },
+    });
+
+    if (!order) {
+      return { ignored: true, reason: 'ORDER_NOT_FOUND' };
+    }
+
+    if (order.status === OrderStatus.COMPLETED) {
+      return { ignored: true, reason: 'ORDER_ALREADY_COMPLETED' };
+    }
+
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(
+        'Đơn hàng không ở trạng thái chờ thanh toán',
+      );
+    }
+
+    const expectedAmount = Math.round(Number(order.total_amount));
+    if (webhookData.amount !== expectedAmount) {
+      throw new BadRequestException(
+        'Số tiền thanh toán payOS không khớp đơn hàng',
+      );
+    }
+
+    if (
+      order.payment_gateway_id &&
+      order.payment_gateway_id !== webhookData.paymentLinkId
+    ) {
+      throw new BadRequestException(
+        'Mã payment link payOS không khớp đơn hàng',
+      );
+    }
+
+    const fulfilledOrder = await this.testFulfillOrder(
+      order.id,
+      'PAYOS',
+      webhookData.paymentLinkId,
+      true,
+    );
+
+    return { fulfilled: true, orderId: fulfilledOrder.id };
   }
 
   async findOne(id: number) {

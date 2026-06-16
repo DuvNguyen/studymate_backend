@@ -19,10 +19,4 @@ export class OrdersController {
   getOrder(@Param('id') id: string) {
     return this.ordersService.findOne(+id);
   }
-
-  // Temporary endpoint to bypass payment gateway for now
-  @Post(':id/simulate-payment')
-  simulatePayment(@Param('id') id: string) {
-    return this.ordersService.testFulfillOrder(+id);
-  }
 }

@@ -86,12 +86,18 @@ Tạo file `.env` trong root backend. Các key đang được sử dụng:
 - `NODE_ENV`
 - `PORT`
 - `FRONTEND_URL`
+- `PUBLIC_FRONTEND_URL` (tùy chọn, dùng cho PayOS return/cancel URL; production nên là `https://studymatelms.vercel.app`)
 - `DATABASE_URL`
 - `REDIS_URL` hoặc `REDIS_HOST`, `REDIS_PORT`, `REDIS_TTL`
 - `CLERK_SECRET_KEY`
 - `CLERK_PUBLISHABLE_KEY`
 - `CLERK_JWT_KEY`
 - `CLERK_WEBHOOK_SECRET`
+- `PAYOS_CLIENT_ID`
+- `PAYOS_API_KEY`
+- `PAYOS_CHECKSUM_KEY`
+- `PAYOS_PARTNER_CODE` (tùy chọn)
+- `PAYOS_BASE_URL` (tùy chọn, mặc định SDK dùng PayOS production)
 - `CLOUDINARY_NAME`
 - `CLOUDINARY_API_KEY`
 - `CLOUDINARY_API_SECRET`
@@ -100,6 +106,10 @@ Tạo file `.env` trong root backend. Các key đang được sử dụng:
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REFRESH_TOKEN`
+
+## PayOS webhook
+
+Endpoint nhận webhook thanh toán khóa học là `POST /webhooks/payos`. URL production hiện tại nên đăng ký là `https://studymate-backend-hxc9.onrender.com/api/v1/webhooks/payos`. Khi deploy staging/production, đăng ký URL public dạng `https://<backend-domain>/api/v1/webhooks/payos` trong PayOS. Backend chỉ hoàn tất đơn hàng khi webhook PayOS verify chữ ký thành công, `orderCode` khớp order id, `paymentLinkId` khớp đơn, và số tiền thanh toán khớp `total_amount`.
 
 ## Cài đặt và chạy
 
