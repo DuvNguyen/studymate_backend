@@ -29,12 +29,31 @@ export class DiscussionsController {
     @CurrentUser() user: User,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('status') status?: 'all' | 'read' | 'unread',
+    @Query('replied') replied?: 'all' | 'yes' | 'no',
   ) {
     return this.discussionsService.getInstructorDiscussions(
       user,
       page ? Number(page) : undefined,
       limit ? Number(limit) : undefined,
+      status,
+      replied,
     );
+  }
+
+  @Patch(':id/read')
+  @Roles('INSTRUCTOR')
+  async markAsRead(@CurrentUser() user: User, @Param('id') id: number) {
+    return this.discussionsService.markAsRead(id, user);
+  }
+
+  @Patch('lesson/:lessonId/read')
+  @Roles('INSTRUCTOR')
+  async markLessonAsRead(
+    @CurrentUser() user: User,
+    @Param('lessonId') lessonId: number,
+  ) {
+    return this.discussionsService.markLessonAsRead(lessonId, user);
   }
 
   @Post()
@@ -80,7 +99,11 @@ export class DiscussionsController {
   }
 
   @Get('course/:courseId/search')
-  async search(@Param('courseId') courseId: number, @Query('q') q: string) {
-    return this.discussionsService.search(courseId, q);
+  async search(
+    @Param('courseId') courseId: number,
+    @Query('q') q: string,
+    @CurrentUser() user?: User,
+  ) {
+    return this.discussionsService.search(courseId, q, user);
   }
 }

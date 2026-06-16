@@ -128,8 +128,8 @@ describe('QuizzesService', () => {
     });
     quizRepository.find!.mockResolvedValue([{ id: 10 }, { id: 11 }]);
     attemptRepository.find!.mockResolvedValue([{ quizId: 10 }, { quizId: 11 }]);
-    attemptRepository.findOne!
-      .mockResolvedValueOnce(null)
+    attemptRepository
+      .findOne!.mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 99, quiz: finalQuiz });
     attemptRepository.count!.mockResolvedValue(1);
     questionRepository.find!.mockResolvedValue([
@@ -145,7 +145,9 @@ describe('QuizzesService', () => {
         ],
       },
     ]);
-    attemptRepository.create!.mockImplementation((data) => data);
+    attemptRepository.create!.mockImplementation(
+      (data: unknown) => data as QuizAttempt,
+    );
     attemptRepository.save!.mockResolvedValue({ id: 99 });
 
     await expect(service.startAttempt(finalQuiz.id, 7)).resolves.toEqual({
@@ -240,7 +242,7 @@ describe('QuizzesService', () => {
       expect.objectContaining({
         score: 100,
         isPassed: true,
-        completedAt: expect.any(Date),
+        completedAt: expect.any(Date) as Date,
       }),
     );
   });

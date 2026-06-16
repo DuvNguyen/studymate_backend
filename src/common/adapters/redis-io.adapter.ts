@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
-import { ServerOptions } from 'socket.io';
+import { Server, ServerOptions } from 'socket.io';
 
 export class RedisIoAdapter extends IoAdapter {
   private readonly logger = new Logger(RedisIoAdapter.name);
@@ -19,7 +19,9 @@ export class RedisIoAdapter extends IoAdapter {
   async connectToRedis() {
     const redisUrl = this.config.get<string>('REDIS_URL');
     if (!redisUrl) {
-      this.logger.log('REDIS_URL not set; Socket.IO is using in-memory adapter');
+      this.logger.log(
+        'REDIS_URL not set; Socket.IO is using in-memory adapter',
+      );
       return;
     }
 
@@ -31,7 +33,10 @@ export class RedisIoAdapter extends IoAdapter {
       this.adapterConstructor = createAdapter(pubClient, subClient);
       this.logger.log('Socket.IO Redis adapter connected');
     } catch (error) {
-      this.logger.error('Failed to connect Socket.IO Redis adapter', error as Error);
+      this.logger.error(
+        'Failed to connect Socket.IO Redis adapter',
+        error as Error,
+      );
     }
   }
 
@@ -51,7 +56,7 @@ export class RedisIoAdapter extends IoAdapter {
       credentials: true,
     };
 
-    const server = super.createIOServer(port, { ...options, cors });
+    const server = super.createIOServer(port, { ...options, cors }) as Server;
     if (this.adapterConstructor) {
       server.adapter(this.adapterConstructor);
     }

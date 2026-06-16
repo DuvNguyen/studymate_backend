@@ -69,6 +69,9 @@ export class LessonDiscussion {
   @Column({ default: false })
   is_deleted: boolean;
 
+  @Column({ default: false })
+  is_read: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 

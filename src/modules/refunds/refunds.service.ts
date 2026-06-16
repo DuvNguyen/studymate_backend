@@ -120,7 +120,10 @@ export class RefundsService {
         title: 'Yêu cầu hoàn tiền mới',
         message: `Học viên vừa yêu cầu hoàn tiền cho khóa học "${enrollment.course.title}".`,
         linkUrl: '/dashboard/admin/refunds',
-        metadata: { refundId: refundRequest.id, courseId: enrollment.course_id },
+        metadata: {
+          refundId: refundRequest.id,
+          courseId: enrollment.course_id,
+        },
       });
     }
 

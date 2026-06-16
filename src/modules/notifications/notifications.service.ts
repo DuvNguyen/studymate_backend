@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, LessThan, Repository } from 'typeorm';
@@ -61,7 +65,9 @@ export class NotificationsService {
     };
   }
 
-  async sendNotification(payload: CreateNotificationPayload): Promise<Notification>;
+  async sendNotification(
+    payload: CreateNotificationPayload,
+  ): Promise<Notification>;
   async sendNotification(
     userId: number,
     type: NotificationType,
@@ -78,7 +84,13 @@ export class NotificationsService {
   ) {
     const payload =
       typeof payloadOrUserId === 'number'
-        ? this.createLegacyPayload(payloadOrUserId, type, title, message, metadata)
+        ? this.createLegacyPayload(
+            payloadOrUserId,
+            type,
+            title,
+            message,
+            metadata,
+          )
         : payloadOrUserId;
 
     const notification = this.notificationsRepo.create({
@@ -122,7 +134,9 @@ export class NotificationsService {
   }
 
   async deleteOldRead(userId: number, before?: string) {
-    const beforeDate = before ? new Date(before) : this.getDefaultDeleteBeforeDate();
+    const beforeDate = before
+      ? new Date(before)
+      : this.getDefaultDeleteBeforeDate();
     if (Number.isNaN(beforeDate.getTime())) {
       throw new BadRequestException('Mốc thời gian xóa thông báo không hợp lệ');
     }

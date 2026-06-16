@@ -190,7 +190,7 @@ export class DiscussionsService {
     }
 
     const roots = await this.discussionsRepo.findRoots({
-      relations: ['user', 'user.profile'],
+      relations: ['user', 'user.profile', 'user.role'],
     });
 
     const lessonRoots = roots.filter((r) => r.lesson_id === lessonId);
@@ -208,7 +208,7 @@ export class DiscussionsService {
     const results: DiscussionTree[] = [];
     for (const root of lessonRoots) {
       const tree = await this.discussionsRepo.findDescendantsTree(root, {
-        relations: ['user', 'user.profile'],
+        relations: ['user', 'user.profile', 'user.role'],
       });
       results.push(tree as DiscussionTree);
     }
@@ -335,6 +335,8 @@ export class DiscussionsService {
     user: User,
     page: number = 1,
     limit: number = 20,
+    status?: 'all' | 'read' | 'unread',
+    replied?: 'all' | 'yes' | 'no',
   ) {
     const qb = this.discussionsRepo
       .createQueryBuilder('d')
@@ -344,12 +346,38 @@ export class DiscussionsService {
       .leftJoinAndSelect('user.profile', 'profile')
       .leftJoinAndSelect('user.role', 'role')
       .where('course.instructorId = :instructorId', { instructorId: user.id })
-      .andWhere('d.parent_id IS NULL')
-      .orderBy('d.created_at', 'DESC')
+      .andWhere('d.parent_id IS NULL');
+
+    if (status === 'unread') {
+      qb.andWhere('d.is_read = :isRead', { isRead: false });
+    } else if (status === 'read') {
+      qb.andWhere('d.is_read = :isRead', { isRead: true });
+    }
+
+    if (replied === 'no') {
+      qb.andWhere(
+        'NOT EXISTS (SELECT 1 FROM lesson_discussions r WHERE r.parent_id = d.id AND r.is_deleted = false)',
+      );
+    } else if (replied === 'yes') {
+      qb.andWhere(
+        'EXISTS (SELECT 1 FROM lesson_discussions r WHERE r.parent_id = d.id AND r.is_deleted = false)',
+      );
+    }
+
+    qb.orderBy('d.created_at', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     const [roots, total] = await qb.getManyAndCount();
+
+    // Fetch all votes of the instructor for discussions
+    const userVotes = await this.discussionVotesRepo.find({
+      where: { user_id: user.id },
+    });
+    const voteMap = new Map<number, number>();
+    for (const v of userVotes) {
+      voteMap.set(v.discussion_id, v.value);
+    }
 
     // Map to DTOs
     const results = await Promise.all(
@@ -358,7 +386,7 @@ export class DiscussionsService {
         const tree = await this.discussionsRepo.findDescendantsTree(root, {
           relations: ['user', 'user.profile', 'user.role'],
         });
-        return this.mapToDto(tree, new Map());
+        return this.mapToDto(tree, voteMap);
       }),
     );
 
@@ -373,20 +401,71 @@ export class DiscussionsService {
     };
   }
 
+  async markAsRead(id: number, user: User) {
+    const discussion = await this.discussionsRepo.findOne({
+      where: { id },
+      relations: ['course'],
+    });
+
+    if (!discussion) throw new NotFoundException('Không tìm thấy thảo luận');
+
+    if (
+      discussion.course.instructorId !== user.id &&
+      user.role.roleName !== 'ADMIN'
+    ) {
+      throw new ForbiddenException('Bạn không có quyền cập nhật thảo luận này');
+    }
+
+    discussion.is_read = true;
+    return this.discussionsRepo.save(discussion);
+  }
+
+  async markLessonAsRead(lessonId: number, user: User) {
+    const discussions = await this.discussionsRepo
+      .createQueryBuilder('d')
+      .innerJoin('d.course', 'course')
+      .where('d.lesson_id = :lessonId', { lessonId })
+      .andWhere('course.instructorId = :instructorId', {
+        instructorId: user.id,
+      })
+      .andWhere('d.parent_id IS NULL')
+      .andWhere('d.is_read = false')
+      .getMany();
+
+    if (discussions.length > 0) {
+      for (const d of discussions) {
+        d.is_read = true;
+      }
+      await this.discussionsRepo.save(discussions);
+    }
+    return { success: true, count: discussions.length };
+  }
+
   async search(
     courseId: number,
     keyword: string,
+    user?: User,
   ): Promise<DiscussionResponseDto[]> {
     const discussions = await this.discussionsRepo.find({
       where: {
         course_id: courseId,
         content: Like(`%${keyword}%`),
       },
-      relations: ['user', 'user.profile'],
+      relations: ['user', 'user.profile', 'user.role'],
       order: { created_at: 'DESC' },
     });
 
-    return discussions.map((d) => this.mapToDto(d, new Map()));
+    const voteMap = new Map<number, number>();
+    if (user) {
+      const userVotes = await this.discussionVotesRepo.find({
+        where: { user_id: user.id },
+      });
+      for (const v of userVotes) {
+        voteMap.set(v.discussion_id, v.value);
+      }
+    }
+
+    return discussions.map((d) => this.mapToDto(d, voteMap));
   }
 
   private mapToDto(

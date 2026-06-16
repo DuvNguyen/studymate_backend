@@ -65,6 +65,9 @@ export class DiscussionResponseDto {
   is_edited: boolean;
 
   @Expose()
+  is_read: boolean;
+
+  @Expose()
   parent_id: number;
 
   @Expose()

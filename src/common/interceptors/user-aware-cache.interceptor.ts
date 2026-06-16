@@ -34,6 +34,7 @@ const PERSONAL_ROUTE_PREFIXES = [
   '/api/v1/lesson-progress',
   '/api/v1/wishlist',
   '/api/v1/statistics',
+  '/api/v1/discussions',
 ];
 
 @Injectable()

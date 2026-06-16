@@ -87,7 +87,11 @@ export class ReviewsService {
           title: 'Đánh giá mới!',
           message: `Khóa học "${course.title}" vừa nhận được một đánh giá ${data.rating} sao mới.`,
           linkUrl: `/dashboard/instructor/courses/${data.courseId}/builder`,
-          metadata: { courseId: data.courseId, reviewId: review.id, rating: data.rating },
+          metadata: {
+            courseId: data.courseId,
+            reviewId: review.id,
+            rating: data.rating,
+          },
         });
       }
 

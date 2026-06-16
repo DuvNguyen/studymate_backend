@@ -364,7 +364,11 @@ export class WalletsService {
           title: 'Yêu cầu rút tiền bị từ chối',
           message: `Yêu cầu rút tiền bị từ chối. Lý do: ${dto.adminNote || 'Không rõ'}. Vui lòng kiểm tra lại thông tin ngân hàng.`,
           linkUrl: '/dashboard/instructor/wallet',
-          metadata: { payoutId: payout.id, status: dto.status, reason: dto.adminNote },
+          metadata: {
+            payoutId: payout.id,
+            status: dto.status,
+            reason: dto.adminNote,
+          },
         });
       }
 

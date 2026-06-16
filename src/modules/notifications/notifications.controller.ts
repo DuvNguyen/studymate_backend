@@ -1,4 +1,12 @@
-import { Controller, Delete, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Patch,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -50,4 +58,3 @@ export class NotificationsController {
     return this.notificationsService.deleteOldRead(user.id, before);
   }
 }
-

@@ -230,10 +230,48 @@ export async function seedTransactions(dataSource: DataSource) {
     await transactionRepo.save(tx);
   }
 
-  // Cập nhật lại số dư ví cuối cùng
-  instructorWallet.balance_available = currentInstructorBalance;
-  systemWallet.balance_available = currentSystemBalance;
-  await walletRepo.save([instructorWallet, systemWallet]);
+  // Cập nhật lại số dư ví cuối cùng bằng cách tính toán chính xác từ lịch sử giao dịch vừa tạo
+  const walletsToUpdate = [instructorWallet, systemWallet, studentWallet];
+  for (const wallet of walletsToUpdate) {
+    const txs = await transactionRepo.find({ where: { wallet_id: wallet.id } });
+    let pending = 0;
+    let available = 0;
+    let withdrawalsCompleted = 0;
+
+    for (const tx of txs) {
+      const amount = Number(tx.amount);
+      if (tx.transaction_type === 'EARNING') {
+        if (tx.status === 'LOCKED') {
+          pending += amount;
+        } else if (tx.status === 'AVAILABLE' || tx.status === 'COMPLETED') {
+          available += amount;
+        }
+      } else if (tx.transaction_type === 'REFUND') {
+        if (tx.status !== 'CANCELLED') {
+          available += amount;
+        }
+      } else if (tx.transaction_type === 'WITHDRAWAL') {
+        if (tx.status !== 'CANCELLED') {
+          available += amount;
+          if (tx.status === 'AVAILABLE' || tx.status === 'COMPLETED') {
+            withdrawalsCompleted += Math.abs(amount);
+          }
+        }
+      } else if (
+        tx.transaction_type === 'PURCHASE' ||
+        tx.transaction_type === 'PLATFORM_FEE'
+      ) {
+        if (tx.status !== 'CANCELLED') {
+          available += amount;
+        }
+      }
+    }
+
+    wallet.balance_pending = pending;
+    wallet.balance_available = available;
+    wallet.total_earned = pending + available + withdrawalsCompleted;
+    await walletRepo.save(wallet);
+  }
 
   console.log('\nSeed giao dịch thành công cho Admin Ledger.');
 }

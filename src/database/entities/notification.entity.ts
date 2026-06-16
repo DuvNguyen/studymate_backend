@@ -75,7 +75,11 @@ export class Notification {
   category: NotificationCategory;
 
   @Index('idx_notifications_event_type')
-  @Column({ name: 'event_type', type: 'varchar', default: NotificationEventType.SYSTEM })
+  @Column({
+    name: 'event_type',
+    type: 'varchar',
+    default: NotificationEventType.SYSTEM,
+  })
   eventType: NotificationEventType;
 
   @Column()

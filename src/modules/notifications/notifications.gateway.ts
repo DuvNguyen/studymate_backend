@@ -35,7 +35,8 @@ export class NotificationsGateway
     }
 
     try {
-      const normalizeOrigin = (value: string) => value.trim().replace(/\/+$/, '');
+      const normalizeOrigin = (value: string) =>
+        value.trim().replace(/\/+$/, '');
       const frontendOrigins = (this.config.get<string>('FRONTEND_URL') || '')
         .split(',')
         .map((origin) => normalizeOrigin(origin))
@@ -51,7 +52,7 @@ export class NotificationsGateway
         return;
       }
 
-      client.data.userId = user.id;
+      (client.data as { userId?: number }).userId = user.id;
       await client.join(this.getUserRoom(user.id));
       this.logger.log('Notification socket connected for user ' + user.id);
     } catch (error) {
@@ -64,9 +65,10 @@ export class NotificationsGateway
   }
 
   handleDisconnect(client: Socket) {
-    if (client.data.userId) {
+    const userId = (client.data as { userId?: number }).userId;
+    if (userId) {
       this.logger.log(
-        'Notification socket disconnected for user ' + client.data.userId,
+        'Notification socket disconnected for user ' + userId.toString(),
       );
     }
   }
@@ -79,7 +81,8 @@ export class NotificationsGateway
   }
 
   private extractToken(client: Socket) {
-    const authToken = client.handshake.auth?.token;
+    const auth = client.handshake.auth as Record<string, unknown> | undefined;
+    const authToken = auth?.token;
     if (typeof authToken === 'string' && authToken.length > 0) {
       return authToken;
     }

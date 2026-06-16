@@ -146,11 +146,7 @@ export class QuizzesService {
     });
   }
 
-  private isAttemptExpired(
-    attempt: QuizAttempt,
-    quiz: Quiz,
-    now = new Date(),
-  ) {
+  private isAttemptExpired(attempt: QuizAttempt, quiz: Quiz, now = new Date()) {
     if (!quiz.timeLimit || quiz.timeLimit <= 0) return false;
     const expiresAt = new Date(
       attempt.startedAt.getTime() + quiz.timeLimit * 60 * 1000,
@@ -506,8 +502,14 @@ export class QuizzesService {
           eventType: NotificationEventType.QUIZ_RESULT,
           title: 'Chúc mừng! Vượt qua bài kiểm tra!',
           message: `Bạn đã đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%) trong bài kiểm tra "${quizTitle}".${quiz.isFinal ? ' Bạn đã đủ điều kiện hoàn thành khóa học!' : ''}`,
-          linkUrl: quiz.course?.slug ? `/courses/${quiz.course.slug}/learn` : null,
-          metadata: { quizId: quiz.id, score: scorePercent, courseId: quiz.courseId },
+          linkUrl: quiz.course?.slug
+            ? `/courses/${quiz.course.slug}/learn`
+            : null,
+          metadata: {
+            quizId: quiz.id,
+            score: scorePercent,
+            courseId: quiz.courseId,
+          },
         });
       } else {
         await this.notificationsService.sendNotification({
@@ -517,8 +519,14 @@ export class QuizzesService {
           eventType: NotificationEventType.QUIZ_RESULT,
           title: 'Kết quả bài kiểm tra',
           message: `Rất tiếc, bạn chỉ đạt ${correctCount}/${totalCount} (điểm ${Math.round(scorePercent)}%). Hãy ôn tập lại và thử lại nhé!`,
-          linkUrl: quiz.course?.slug ? `/courses/${quiz.course.slug}/learn` : null,
-          metadata: { quizId: quiz.id, score: scorePercent, courseId: quiz.courseId },
+          linkUrl: quiz.course?.slug
+            ? `/courses/${quiz.course.slug}/learn`
+            : null,
+          metadata: {
+            quizId: quiz.id,
+            score: scorePercent,
+            courseId: quiz.courseId,
+          },
         });
       }
 
