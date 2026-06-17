@@ -264,6 +264,33 @@ export class VideosService {
     };
   }
 
+  async getPendingInstructors() {
+    const result = await this.videosRepository
+      .createQueryBuilder('video')
+      .leftJoin('video.uploader', 'uploader')
+      .leftJoin('uploader.profile', 'profile')
+      .select([
+        'uploader.id AS "uploaderId"',
+        'uploader.email AS "email"',
+        'uploader.avatarUrl AS "avatarUrl"',
+        'profile.fullName AS "fullName"',
+        'COUNT(video.id) AS "pendingCount"',
+      ])
+      .where('video.status = :status', { status: VideoStatus.PENDING_REVIEW })
+      .groupBy('uploader.id')
+      .addGroupBy('profile.userId')
+      .orderBy('"pendingCount"', 'DESC')
+      .getRawMany();
+
+    return result.map((item) => ({
+      uploaderId: Number(item.uploaderId),
+      email: item.email,
+      fullName: item.fullName || null,
+      avatarUrl: item.avatarUrl || null,
+      pendingCount: Number(item.pendingCount),
+    }));
+  }
+
   async reviewVideo(
     videoId: number,
     reviewerId: number,

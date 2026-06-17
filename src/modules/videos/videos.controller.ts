@@ -92,6 +92,16 @@ export class VideosController {
   }
 
   /**
+   * GET /api/v1/videos/pending-instructors
+   * Staff/Admin lấy danh sách giảng viên có video chờ duyệt
+   */
+  @Get('pending-instructors')
+  @Roles('STAFF', 'ADMIN')
+  async getPendingInstructors() {
+    return this.videosService.getPendingInstructors();
+  }
+
+  /**
    * GET /api/v1/videos/pending
    * Staff/Admin lấy danh sách video đang chờ duyệt
    */
