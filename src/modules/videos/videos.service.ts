@@ -210,6 +210,18 @@ export class VideosService {
       });
     }
 
+    if (query.q) {
+      const parsedId = Number(query.q);
+      if (!Number.isNaN(parsedId) && Number.isInteger(parsedId)) {
+        qb.andWhere('(video.title ILIKE :q OR video.id = :qId)', {
+          q: `%${query.q}%`,
+          qId: parsedId,
+        });
+      } else {
+        qb.andWhere('video.title ILIKE :q', { q: `%${query.q}%` });
+      }
+    }
+
     qb.orderBy('video.uploadedAt', 'ASC').skip(skip).take(limit);
 
     const [videos, total] = await qb.getManyAndCount();

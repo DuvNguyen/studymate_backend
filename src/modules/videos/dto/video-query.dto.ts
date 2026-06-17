@@ -27,4 +27,9 @@ export class VideoQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsString()
+  q?: string;
 }
+
