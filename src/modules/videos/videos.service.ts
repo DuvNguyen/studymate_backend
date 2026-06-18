@@ -277,6 +277,14 @@ export class VideosService {
   }
 
   async getPendingInstructors() {
+    interface RawPendingInstructor {
+      uploaderId: string | number;
+      email: string;
+      fullName: string | null;
+      avatarUrl: string | null;
+      pendingCount: string | number;
+    }
+
     const result = await this.videosRepository
       .createQueryBuilder('video')
       .leftJoin('video.uploader', 'uploader')
@@ -292,7 +300,7 @@ export class VideosService {
       .groupBy('uploader.id')
       .addGroupBy('profile.userId')
       .orderBy('"pendingCount"', 'DESC')
-      .getRawMany();
+      .getRawMany<RawPendingInstructor>();
 
     return result.map((item) => ({
       uploaderId: Number(item.uploaderId),

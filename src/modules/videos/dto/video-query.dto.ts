@@ -32,4 +32,3 @@ export class VideoQueryDto {
   @IsString()
   q?: string;
 }
-
